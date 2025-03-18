@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { RefreshCw, Trash2, Send, Loader2, AlertCircle, Plus } from "lucide-react";
+import { RefreshCw, Trash2, Send, Loader2, AlertCircle, Plus, Brain, MessageCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -40,6 +40,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const [conversations, setConversations] = useState<ConversationInfo[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>("");
   const [showConversationList, setShowConversationList] = useState(false);
+  const [generationMode, setGenerationMode] = useState<"normal" | "reasoning">("normal");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -137,9 +138,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     setError(null);
 
     try {
+      let systemPrompt = "";
+      
+      // Ajouter un système prompt différent selon le mode
+      if (generationMode === "reasoning") {
+        systemPrompt = "Vous êtes un assistant IA qui expose son raisonnement étape par étape. Pour chaque réponse, commencez par une analyse détaillée du problème, puis développez votre raisonnement de manière claire et structurée avant de donner votre conclusion finale.";
+      } else {
+        systemPrompt = "Vous êtes un assistant IA concis et direct. Répondez de manière claire et efficace.";
+      }
+      
       await generateGroqCompletion(
         selectedModel,
-        [...messages, userMessage],
+        [{ role: "system", content: systemPrompt }, ...messages, userMessage],
         (chunk: string) => {
           setMessages((prev) => {
             const newMessages = [...prev];
@@ -172,7 +182,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
       setIsTyping(false);
       setIsLoadingModels(false);
     }
-  }, [input, isLoadingModels, messages, selectedModel, isConnected]);
+  }, [input, isLoadingModels, messages, selectedModel, isConnected, generationMode]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     // Submit on Enter (without Shift for new line)
@@ -319,8 +329,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     <div className={`flex flex-col h-full overflow-hidden ${className}`}>
       {/* Main chat area with gradient background */}
       <div className="flex-1 overflow-hidden bg-gradient-to-b from-blue-500 to-indigo-800 relative">
-        <ScrollArea className="h-full py-6 px-4 pb-20">
-          <div className="space-y-6 max-w-3xl mx-auto pb-24">
+        <ScrollArea className="h-full py-6 px-2 sm:px-4 pb-20">
+          <div className="space-y-6 w-full max-w-3xl mx-auto pb-24">
             {messages.map((message, index) => (
               <ChatMessage
                 key={index}
@@ -335,14 +345,36 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
       </div>
 
       {/* Footer with actions and input */}
-      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md p-4 fixed bottom-0 w-full">
-        <div className="flex flex-col gap-3 w-[70%] mx-auto">
+      <div className="bg-background py-3 sm:py-4 px-4 border-t">
+        <div className="flex flex-col gap-3 w-[95%] sm:w-[90%] md:w-[80%] lg:w-[70%] mx-auto">
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+          
+          {/* Boutons de mode */}
+          <div className="flex justify-center space-x-2 mb-2">
+            <Button
+              variant={generationMode === "normal" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setGenerationMode("normal")}
+              className="rounded-full"
+            >
+              <MessageCircle className="h-4 w-4 mr-1" />
+              Normal
+            </Button>
+            <Button
+              variant={generationMode === "reasoning" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setGenerationMode("reasoning")}
+              className="rounded-full"
+            >
+              <Brain className="h-4 w-4 mr-1" />
+              Reasoning
+            </Button>
+          </div>
           
           <div className="flex gap-2 items-end">
             {messages.length > 1 && (
@@ -351,7 +383,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                 size="icon"
                 onClick={clearConversation}
                 title="Clear conversation"
-                className="h-9 w-9"
+                className="h-9 w-9 flex-shrink-0"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -365,13 +397,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                 onKeyDown={handleKeyDown}
                 placeholder="Type your message..."
                 disabled={!isConnected || isTyping}
-                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 rounded-full px-4"
+                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 rounded-full px-3 sm:px-4 py-2 text-sm sm:text-base"
               />
               <Button
                 onClick={handleSend}
                 disabled={!isConnected || isTyping || !input.trim()}
                 variant="ghost"
-                className="rounded-full h-auto"
+                className="rounded-full h-auto flex-shrink-0"
               >
                 {isLoadingModels ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -380,13 +412,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                 )}
               </Button>
             </div>
+            
             {isTyping && (
               <Button
                 variant="outline"
                 size="icon"
                 onClick={stopGeneration}
                 title="Stop generation"
-                className="h-9 w-9"
+                className="h-9 w-9 flex-shrink-0"
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
