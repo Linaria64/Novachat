@@ -420,54 +420,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
 
   return (
     <div className={`flex flex-col h-full overflow-hidden ${className}`}>
-      {/* Header with glass effect */}
-      <div className="flex items-center gap-2 p-3 border-b bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 z-10">
-        <div className="flex items-center gap-2 flex-1">
-          <Button 
-            variant="ghost" 
-            size="icon"
-            className="rounded-full h-9 w-9"
-            onClick={createNewConversation}
-            title="New conversation"
-          >
-            <Plus className="h-5 w-5" />
-          </Button>
-          
-          <Button 
-            variant="ghost" 
-            size="icon"
-            className="rounded-full h-9 w-9"
-            onClick={() => setShowConversationList(true)}
-            title="View conversations"
-          >
-            <LayoutList className="h-5 w-5" />
-          </Button>
-          
-          <Separator orientation="vertical" className="h-6 mx-1" />
-          
-          <div className="flex items-center gap-1">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-              <Bot className="h-5 w-5 text-primary" />
-            </div>
-            <h1 className="text-lg font-semibold hidden md:block">Chatopia</h1>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-1">
-          <ModelSelector
-            models={models}
-            selectedModel={selectedModel}
-            onModelChange={handleModelChange}
-            isLoading={isLoadingModels}
-          />
-          <ConnectionStatus isConnected={isConnected} />
-          <ThemeToggle />
-          <SettingsDialog onSettingsChange={handleSettingsChange} />
-        </div>
-      </div>
-
-      {/* Main chat area */}
-      <div className="flex-1 overflow-hidden bg-background/50 relative">
+      {/* Main chat area with gradient background */}
+      <div className="flex-1 overflow-hidden bg-gradient-to-b from-blue-100 to-purple-100 dark:from-blue-950 dark:to-purple-950 relative">
         <ScrollArea className="h-full py-6 px-4">
           {messages.length === 0 ? (
             welcomeScreen
@@ -488,7 +442,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
       </div>
 
       {/* Footer with actions and input */}
-      <div className="border-t bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 p-3">
+      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md p-4">
         <div className="flex flex-col gap-3 max-w-3xl mx-auto">
           {error && (
             <Alert variant="destructive">
@@ -498,39 +452,41 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
           )}
           
           <div className="flex gap-2 items-end">
-            {messages.length > 0 && (
-              <div className="flex gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={clearConversation}
-                  title="Clear conversation"
-                  className="h-9 w-9"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={downloadConversation}
-                  title="Download conversation"
-                  className="h-9 w-9"
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={shareConversation}
-                  title="Share conversation"
-                  className="h-9 w-9"
-                >
-                  <Share2 className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            <div className="flex gap-1 items-center">
+              <ConnectionStatus isConnected={isConnected} />
+              <ThemeToggle />
+              <SettingsDialog onSettingsChange={handleSettingsChange} />
+              <ModelSelector
+                models={models}
+                selectedModel={selectedModel}
+                onModelChange={handleModelChange}
+                isLoading={isLoadingModels}
+              />
+              {messages.length > 0 && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={clearConversation}
+                    title="Clear conversation"
+                    className="h-9 w-9"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={shareConversation}
+                    title="Share conversation"
+                    className="h-9 w-9"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
             
-            <div className="flex-1 flex bg-muted/50 rounded-md border focus-within:ring-1 focus-within:ring-primary">
+            <div className="flex-1 flex bg-white dark:bg-gray-800 rounded-full shadow-md focus-within:ring-1 focus-within:ring-primary">
               <Input
                 ref={inputRef}
                 value={input}
@@ -538,13 +494,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                 onKeyDown={handleKeyDown}
                 placeholder="Type your message..."
                 disabled={!isConnected || isTyping}
-                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 rounded-full px-4"
               />
               <Button
                 onClick={handleSend}
                 disabled={!isConnected || isTyping || !input.trim()}
                 variant="ghost"
-                className="rounded-l-none h-auto"
+                className="rounded-full h-auto"
               >
                 {isLoadingModels ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
