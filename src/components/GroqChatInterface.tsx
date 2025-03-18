@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Download, Trash2, MessageSquarePlus, Terminal, X, Mic, FilePlus, User, Send } from "lucide-react";
+import { Download, Trash2, MessageSquarePlus, Terminal, X, Mic, FilePlus, User, Send, Menu, Copy, Code2, FileText, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,33 +11,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import ChatMessage from "@/components/ChatMessage";
 import TypingIndicator from "@/components/TypingIndicator";
 import GroqSettingsDialog from "@/components/GroqSettingsDialog";
-import { checkConnection, getSettings, generateCompletionStream } from "@/services/localService";
-import { Message, Settings } from "@/types/chat";
-
-interface Conversation {
-  id: string;
-  title: string;
-  messages: Message[];
-  createdAt: number;
-  updatedAt: number;
-}
-
-interface Preview {
-  type: "code" | "image" | "text" | "terminal";
-  content: string;
-  language?: string;
-  title?: string;
-}
-
-interface DevModeInfo {
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  streamingEnabled: boolean;
-  connectionStatus: string;
-  messageCount: number;
-  lastResponseTime: number;
-}
+import { checkConnection, getSettings, generateCompletionStream, getModels } from "@/services/localService";
+import { Message, Settings, Model, Preview, Conversation, DevModeInfo } from "@/types/chat";
 
 const GroqChatInterface: React.FC = () => {
   const [input, setInput] = useState("");
@@ -363,7 +338,7 @@ const GroqChatInterface: React.FC = () => {
   }, [activeConversation]);
 
   const copyConversation = useCallback(() => {
-    if (activeConversation.messages.length === 0) {
+    if (!activeConversation || activeConversation.messages.length === 0) {
       toast.info("No conversation to copy");
       return;
     }
@@ -477,155 +452,134 @@ const GroqChatInterface: React.FC = () => {
       />
 
       {/* Sidebar */}
-      <div 
-        className={`sidebar ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}
-        onMouseLeave={() => setIsSidebarOpen(false)}
-      >
-        <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between p-4 border-b border-glass-border">
-            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Chatopia
-            </h1>
-            <div className="flex items-center gap-2">
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 300, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="flex flex-col border-r"
+          >
+            <div className="p-4 border-b">
               <Button
-                variant="ghost"
-                size="icon"
+                variant="outline"
+                className="w-full"
                 onClick={createNewConversation}
-                title="New conversation"
-                className="h-8 w-8"
               >
-                <MessageSquarePlus className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsDevMode(!isDevMode)}
-                title={isDevMode ? "Switch to User Mode" : "Switch to Developer Mode"}
-                className="h-8 w-8"
-              >
-                {isDevMode ? <User className="h-4 w-4" /> : <Terminal className="h-4 w-4" />}
+                <MessageSquarePlus className="h-4 w-4 mr-2" />
+                New Conversation
               </Button>
             </div>
-          </div>
-          
-          <ScrollArea className="flex-1 p-3">
-            <div className="space-y-2">
-              {conversations.length === 0 ? (
-                <div className="text-center py-6 text-gray-500 dark:text-gray-400 text-sm">
-                  No conversations yet
-                </div>
-              ) : (
-                [...conversations]
-                  .sort((a, b) => b.updatedAt - a.updatedAt)
-                  .map((conversation) => (
-                    <motion.div
-                      key={conversation.id}
-                      whileHover={{ scale: 1.01 }}
-                      className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors glassmorphism-light ${
-                        activeConversationId === conversation.id
-                          ? "bg-blue-100/50 dark:bg-blue-900/30"
-                          : "hover:bg-gray-100/50 dark:hover:bg-gray-700/30"
-                      }`}
-                      onClick={() => setActiveConversationId(conversation.id)}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{conversation.title}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {formatDate(conversation.updatedAt)}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteConversation(conversation.id);
-                        }}
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </motion.div>
-                  ))
-              )}
-            </div>
-          </ScrollArea>
-          
-          {isDevMode && (
-            <div className="p-4 border-t border-glass-border">
-              <div className="text-sm space-y-2">
-                <div className="flex justify-between">
-                  <span>Model:</span>
-                  <span className="font-mono">{devInfo.model}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Temperature:</span>
-                  <span className="font-mono">{devInfo.temperature}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Max Tokens:</span>
-                  <span className="font-mono">{devInfo.maxTokens}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Streaming:</span>
-                  <span className="font-mono">{devInfo.streamingEnabled ? "Yes" : "No"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Status:</span>
-                  <span className="font-mono">{devInfo.connectionStatus}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Messages:</span>
-                  <span className="font-mono">{devInfo.messageCount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Last Response:</span>
-                  <span className="font-mono">{devInfo.lastResponseTime}ms</span>
+            
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-2">
+                {conversations.map((conversation) => (
+                  <Button
+                    key={conversation.id}
+                    variant={conversation.id === activeConversationId ? "secondary" : "ghost"}
+                    className="w-full justify-start"
+                    onClick={() => setActiveConversationId(conversation.id)}
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">{conversation.title}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(conversation.updatedAt)}
+                      </span>
+                    </div>
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
+            
+            {isDevMode && (
+              <div className="p-4 border-t border-glass-border">
+                <div className="text-sm space-y-2">
+                  <div className="flex justify-between">
+                    <span>Model:</span>
+                    <span className="font-mono">{devInfo.model}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Temperature:</span>
+                    <span className="font-mono">{devInfo.temperature}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Max Tokens:</span>
+                    <span className="font-mono">{devInfo.maxTokens}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Streaming:</span>
+                    <span className="font-mono">{devInfo.streamingEnabled ? "Yes" : "No"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Status:</span>
+                    <span className="font-mono">{devInfo.connectionStatus}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Messages:</span>
+                    <span className="font-mono">{devInfo.messageCount}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Last Response:</span>
+                    <span className="font-mono">{devInfo.lastResponseTime}ms</span>
+                  </div>
                 </div>
               </div>
+            )}
+            
+            <div className="p-4 border-t border-glass-border">
+              {isDevMode && <GroqSettingsDialog onSettingsChange={handleSettingsChange} />}
+              <ThemeToggle />
             </div>
-          )}
-          
-          <div className="p-4 border-t border-glass-border">
-            {isDevMode && <GroqSettingsDialog onSettingsChange={handleSettingsChange} />}
-            <ThemeToggle />
-          </div>
-        </div>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden pl-2">
         {/* Header */}
         <header className="flex justify-between items-center p-3 glassmorphism">
           <div className="flex items-center space-x-2">
-            {activeConversation?.title}
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Download className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="glassmorphism">
-                <DropdownMenuItem onClick={downloadConversation} disabled={activeConversation?.messages.length === 0}>
-                  Download conversation
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={copyConversation} disabled={activeConversation?.messages.length === 0}>
-                  Copy to clipboard
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
             <Button
               variant="ghost"
               size="icon"
-              onClick={clearConversation}
-              disabled={activeConversation?.messages.length === 0}
-              title="Clear conversation"
-              className="h-8 w-8"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             >
-              <Trash2 className="h-4 w-4" />
+              <Menu className="h-4 w-4" />
+            </Button>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Chatopia
+            </h1>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsDevMode(!isDevMode)}
+            >
+              <Terminal className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={copyConversation}
+              disabled={!activeConversation || activeConversation.messages.length === 0}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleFileUpload}
+            >
+              <FilePlus className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={startVoiceInput}
+            >
+              <Mic className="h-4 w-4" />
             </Button>
           </div>
         </header>
@@ -719,43 +673,48 @@ const GroqChatInterface: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="preview-modal"
-            onClick={closePreview}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4"
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="preview-content glassmorphism"
-              onClick={e => e.stopPropagation()}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-background rounded-lg shadow-lg max-w-4xl w-full max-h-[80vh] overflow-hidden"
             >
-              <div className="flex items-center justify-between p-4 border-b border-glass-border">
-                <h3 className="font-medium">{preview.title || "Preview"}</h3>
-                <Button variant="ghost" size="icon" onClick={closePreview}>
+              <div className="flex justify-between items-center p-4 border-b">
+                <h3 className="text-lg font-medium">{preview.title || 'Preview'}</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={closePreview}
+                >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              
               <div className="p-4 overflow-auto max-h-[calc(80vh-4rem)]">
-                {preview.type === "code" && (
-                  <pre className="bg-gray-900 text-gray-200 p-4 rounded-lg overflow-x-auto">
-                    <code className={`language-${preview.language || "plaintext"}`}>
+                {preview.type === 'code' && (
+                  <pre className="bg-muted p-4 rounded-lg">
+                    <code className={`language-${preview.language}`}>
                       {preview.content}
                     </code>
                   </pre>
                 )}
-                {preview.type === "image" && (
-                  <img src={preview.content} alt="Preview" className="max-w-full rounded-lg" />
+                {preview.type === 'image' && (
+                  <img
+                    src={preview.content}
+                    alt={preview.title || 'Preview image'}
+                    className="max-w-full rounded-lg"
+                  />
                 )}
-                {preview.type === "text" && (
+                {preview.type === 'text' && (
                   <div className="prose dark:prose-invert max-w-none">
                     {preview.content}
                   </div>
                 )}
-                {preview.type === "terminal" && (
-                  <div className="bg-gray-900 text-gray-200 p-4 rounded-lg font-mono">
+                {preview.type === 'terminal' && (
+                  <pre className="bg-black text-white p-4 rounded-lg font-mono">
                     {preview.content}
-                  </div>
+                  </pre>
                 )}
               </div>
             </motion.div>

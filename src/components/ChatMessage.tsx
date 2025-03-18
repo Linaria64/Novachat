@@ -1,14 +1,14 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Message } from "@/types/chat";
+import { Message, Preview } from "@/types/chat";
 import { User, Bot } from "lucide-react";
 
 interface ChatMessageProps {
   role: Message["role"];
   content: string;
   isLast?: boolean;
-  onPreview?: (type: "code" | "image" | "text" | "terminal", content: string, language?: string, title?: string) => void;
+  onPreview?: (type: Preview["type"], content: string, language?: string, title?: string) => void;
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isLast, onPreview }): JSX.Element => {
