@@ -1,37 +1,25 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Download, RefreshCw, Trash2, Send, Loader2, AlertCircle, Bot, Plus, Share2, LayoutList, SeparatorHorizontal } from "lucide-react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { RefreshCw, Trash2, Send, Loader2, AlertCircle, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
-import ConnectionStatus from "./ConnectionStatus";
 import {
   generateCompletionStream as generateGroqCompletion,
   checkConnection as checkGroqConnection,
   AVAILABLE_MODELS as GROQ_MODELS
 } from "@/services/groqService";
-import ThemeToggle from "./ThemeToggle";
-import SettingsDialog from "./SettingsDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BaseMessage, MessageRole, GroqModel } from "@/types/chat";
+import { BaseMessage, MessageRole } from "@/types/chat";
 import { Toaster } from "@/components/ui/sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import ModelSelector from "./ModelSelector";
 
 interface ChatInterfaceProps {
   className?: string;
 }
-
-const SUGGESTED_PROMPTS = [
-  "Explain quantum computing in simple terms",
-  "Write a short story about a robot finding emotions",
-  "What are the best practices for learning a new language?",
-  "Create a meal plan for a vegan athlete"
-];
 
 interface ConversationInfo {
   id: string;
@@ -49,7 +37,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [abortController, setAbortController] = useState<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [models, setModels] = useState<GroqModel[]>([]);
   const [conversations, setConversations] = useState<ConversationInfo[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>("");
   const [showConversationList, setShowConversationList] = useState(false);
@@ -57,12 +44,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Définir un message de bienvenue initial
+  useEffect(() => {
+    if (messages.length === 0) {
+      setMessages([
+        {
+          role: "assistant",
+          content: "👋 Bienvenue sur NovaChat! Je suis votre assistant IA personnel. Comment puis-je vous aider aujourd'hui?"
+        }
+      ]);
+    }
+  }, []);
+
   // Define fetchModels function before it's used
   const fetchModels = useCallback(async () => {
     setIsLoadingModels(true);
     try {
-      setModels(GROQ_MODELS);
-      
       // Set default model if none selected
       if (!selectedModel) {
         setSelectedModel(GROQ_MODELS[0].id);
@@ -178,15 +175,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   }, [input, isLoadingModels, messages, selectedModel, isConnected]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    // Submit on Ctrl+Enter or Cmd+Enter
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    // Submit on Enter (without Shift for new line)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevent default to avoid new line
       handleSend();
     }
   }, [handleSend]);
-
-  const handleModelChange = useCallback((modelName: string) => {
-    setSelectedModel(modelName);
-  }, []);
 
   const stopGeneration = useCallback(() => {
     if (abortController) {
@@ -200,43 +194,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const clearConversation = useCallback(() => {
     if (messages.length === 0) return;
     
-    setMessages([]);
+    setMessages([
+      {
+        role: "assistant",
+        content: "👋 Bienvenue sur NovaChat! Je suis votre assistant IA personnel. Comment puis-je vous aider aujourd'hui?"
+      }
+    ]);
     toast.success("Conversation cleared");
-  }, [messages.length]);
-
-  const downloadConversation = useCallback(() => {
-    if (messages.length === 0) {
-      toast.info("No conversation to download");
-      return;
-    }
-    
-    const text = messages
-      .map((msg) => `${msg.role === "user" ? "You" : "AI"}: ${msg.content}`)
-      .join("\n\n");
-    
-    const blob = new Blob([text], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `chatopia-conversation-${new Date().toISOString().split("T")[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast.success("Conversation downloaded");
-  }, [messages]);
-
-  const handleSettingsChange = useCallback(() => {
-    // Clear connection status cache to force a recheck
-    setIsConnected(false);
-    // Clear models cache
-    setModels([]);
-    // Check connection with new settings
-    checkConnectionStatus();
-    // Fetch models with new settings
-    fetchModels();
-  }, [checkConnectionStatus, fetchModels]);
+  }, []);
 
   // Generate a title for a conversation based on the first message
   const generateConversationTitle = useCallback((content: string) => {
@@ -247,7 +212,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const createNewConversation = useCallback(() => {
     const newId = Date.now().toString();
     setCurrentConversationId(newId);
-    setMessages([]);
+    setMessages([
+      {
+        role: "assistant",
+        content: "👋 Bienvenue sur NovaChat! Je suis votre assistant IA personnel. Comment puis-je vous aider aujourd'hui?"
+      }
+    ]);
     setInput("");
     setError(null);
     toast.success("New conversation started");
@@ -288,97 +258,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     setShowConversationList(false);
   }, []);
 
-  // Handle prompt suggestion click
-  const handleSuggestedPrompt = useCallback((prompt: string) => {
-    setInput(prompt);
-    inputRef.current?.focus();
-  }, []);
-
-  // Save conversation when messages change
-  useEffect(() => {
-    saveCurrentConversation();
-  }, [messages, saveCurrentConversation]);
-
-  // Handle share conversation
-  const shareConversation = useCallback(() => {
-    if (messages.length === 0) {
-      toast.info("No conversation to share");
-      return;
-    }
-    
-    const text = messages
-      .map((msg) => `${msg.role === "user" ? "You" : "AI"}: ${msg.content}`)
-      .join("\n\n");
-    
-    // Copy to clipboard as a fallback
-    navigator.clipboard.writeText(text).then(() => {
-      // Try to use the Share API if available
-      if (navigator.share) {
-        navigator.share({
-          title: 'Conversation from Chatopia',
-          text: text
-        }).catch(() => {
-          toast.success("Conversation copied to clipboard");
-        });
-      } else {
-        toast.success("Conversation copied to clipboard");
-      }
-    });
-  }, [messages]);
-
-  // Memoize the welcome screen to prevent unnecessary re-renders
-  const welcomeScreen = useMemo(() => {
-    return (
-      <div className="h-full flex flex-col items-center justify-center p-8">
-        <div className="max-w-md w-full space-y-6">
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-2">
-              <Bot className="h-8 w-8 text-primary" />
-            </div>
-            <h2 className="text-2xl font-bold">Welcome to Chatopia</h2>
-            <p className="text-muted-foreground">
-              Your private and secure way to chat with Groq AI models.
-              {!isConnected && (
-                <span className="block mt-2 text-red-500 font-medium">
-                  Please configure your Groq API key in settings to begin chatting.
-                </span>
-              )}
-            </p>
-          </div>
-          
-          <div className="text-xs text-center text-muted-foreground">
-            Connected to: <span className="font-mono">Groq API</span>
-          </div>
-          
-          {isConnected && (
-            <div className="space-y-4">
-              <div className="bg-card rounded-xl border shadow-sm p-4 text-left">
-                <p className="font-medium text-sm mb-3">Try asking:</p>
-                <div className="grid gap-2">
-                  {SUGGESTED_PROMPTS.map((prompt, i) => (
-                    <button
-                      key={i}
-                      className="text-sm px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 text-left transition-colors"
-                      onClick={() => handleSuggestedPrompt(prompt)}
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                <SeparatorHorizontal className="h-3 w-3" />
-                <span>or start typing below</span>
-                <SeparatorHorizontal className="h-3 w-3" />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }, [isConnected, handleSuggestedPrompt]);
-
   // The conversation list sidebar/dialog
   const conversationList = (
     <Dialog open={showConversationList} onOpenChange={setShowConversationList}>
@@ -418,32 +297,33 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     </Dialog>
   );
 
+  // Save conversation when messages change
+  useEffect(() => {
+    saveCurrentConversation();
+  }, [messages, saveCurrentConversation]);
+
   return (
     <div className={`flex flex-col h-full overflow-hidden ${className}`}>
       {/* Main chat area with gradient background */}
-      <div className="flex-1 overflow-hidden bg-gradient-to-b from-blue-100 to-purple-100 dark:from-blue-950 dark:to-purple-950 relative">
-        <ScrollArea className="h-full py-6 px-4">
-          {messages.length === 0 ? (
-            welcomeScreen
-          ) : (
-            <div className="space-y-6 max-w-3xl mx-auto pb-4">
-              {messages.map((message, index) => (
-                <ChatMessage
-                  key={index}
-                  role={message.role}
-                  content={message.content}
-                />
-              ))}
-              {isTyping && <TypingIndicator />}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
+      <div className="flex-1 overflow-hidden bg-gradient-to-b from-blue-500 to-indigo-800 relative">
+        <ScrollArea className="h-full py-6 px-4 pb-20">
+          <div className="space-y-6 max-w-3xl mx-auto pb-24">
+            {messages.map((message, index) => (
+              <ChatMessage
+                key={index}
+                role={message.role}
+                content={message.content}
+              />
+            ))}
+            {isTyping && <TypingIndicator />}
+            <div ref={messagesEndRef} />
+          </div>
         </ScrollArea>
       </div>
 
       {/* Footer with actions and input */}
-      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md p-4">
-        <div className="flex flex-col gap-3 max-w-3xl mx-auto">
+      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md p-4 fixed bottom-0 w-full">
+        <div className="flex flex-col gap-3 w-[70%] mx-auto">
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -452,39 +332,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
           )}
           
           <div className="flex gap-2 items-end">
-            <div className="flex gap-1 items-center">
-              <ConnectionStatus isConnected={isConnected} />
-              <ThemeToggle />
-              <SettingsDialog onSettingsChange={handleSettingsChange} />
-              <ModelSelector
-                models={models}
-                selectedModel={selectedModel}
-                onModelChange={handleModelChange}
-                isLoading={isLoadingModels}
-              />
-              {messages.length > 0 && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={clearConversation}
-                    title="Clear conversation"
-                    className="h-9 w-9"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={shareConversation}
-                    title="Share conversation"
-                    className="h-9 w-9"
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-            </div>
+            {messages.length > 1 && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={clearConversation}
+                title="Clear conversation"
+                className="h-9 w-9"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
             
             <div className="flex-1 flex bg-white dark:bg-gray-800 rounded-full shadow-md focus-within:ring-1 focus-within:ring-primary">
               <Input
