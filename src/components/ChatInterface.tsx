@@ -223,6 +223,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     toast.success("New conversation started");
   }, []);
 
+  // Ajouter un écouteur d'événements pour la création d'une nouvelle conversation
+  useEffect(() => {
+    const handleNewConversation = () => {
+      createNewConversation();
+    };
+
+    window.addEventListener('novachat:new-conversation', handleNewConversation);
+    
+    return () => {
+      window.removeEventListener('novachat:new-conversation', handleNewConversation);
+    };
+  }, [createNewConversation]);
+
   // Save current conversation
   const saveCurrentConversation = useCallback(() => {
     if (messages.length === 0) return;
