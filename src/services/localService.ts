@@ -1,102 +1,128 @@
 import { Message, Settings, Model } from "@/types/chat";
 import { 
   encryptData, 
-  decryptData, 
-  validateApiKey, 
-  sanitizeInput,
-  createRateLimiter,
-  createSession,
-  validateSession,
-  createToken,
-  validateToken
+  decryptData
 } from "@/utils/security";
 
-const API_URL = import.meta.env.VITE_API_URL;
-const APP_ENV = import.meta.env.VITE_APP_ENV;
-const MAX_REQUESTS = parseInt(import.meta.env.VITE_MAX_REQUESTS_PER_MINUTE || '60');
-const RATE_LIMIT_WINDOW = parseInt(import.meta.env.VITE_RATE_LIMIT_WINDOW || '60000');
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:11434";
+const MAX_REQUESTS_PER_MINUTE = 60;
+const SESSION_TIMEOUT = 3600; // 1 hour
+const TOKEN_EXPIRY = 86400; // 24 hours
 
 const defaultSettings: Settings = {
-  model: 'local-model',
+  model: "groq-model",
+  apiKey: "",
   temperature: 0.7,
   maxTokens: 2000,
-  apiKey: '',
-  streamingEnabled: true
+  streamingEnabled: true,
 };
 
-// Create rate limiter instance
-const rateLimiter = createRateLimiter(MAX_REQUESTS, RATE_LIMIT_WINDOW);
+interface RateLimiter {
+  requests: number;
+  windowStart: number;
+}
 
-// Session management
-let currentSession = '';
-let currentToken = '';
+interface Session {
+  id: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+interface Token {
+  token: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+let rateLimiter: RateLimiter = {
+  requests: 0,
+  windowStart: Date.now(),
+};
+
+let currentSession: Session | null = null;
+let currentToken: Token | null = null;
+
+function createRateLimiter(): boolean {
+  const now = Date.now();
+  if (now - rateLimiter.windowStart > 60000) {
+    rateLimiter = {
+      requests: 0,
+      windowStart: now,
+    };
+  }
+  if (rateLimiter.requests >= MAX_REQUESTS_PER_MINUTE) {
+    return false;
+  }
+  rateLimiter.requests++;
+  return true;
+}
+
+function createSession(): Session {
+  const now = Date.now();
+  return {
+    id: crypto.randomUUID(),
+    createdAt: now,
+    expiresAt: now + SESSION_TIMEOUT * 1000,
+  };
+}
+
+function validateSession(session: Session): boolean {
+  return Date.now() < session.expiresAt;
+}
+
+function createToken(): Token {
+  const now = Date.now();
+  return {
+    token: crypto.randomUUID(),
+    createdAt: now,
+    expiresAt: now + TOKEN_EXPIRY * 1000,
+  };
+}
+
+function validateToken(token: Token): boolean {
+  return Date.now() < token.expiresAt;
+}
 
 export const getSettings = (): Settings => {
   try {
-    const savedSettings = localStorage.getItem('chatopia-settings');
-    if (!savedSettings) return defaultSettings;
+    const saved = localStorage.getItem("chatopia-settings");
+    if (!saved) return defaultSettings;
 
-    const decryptedSettings = decryptData(savedSettings);
-    if (!decryptedSettings) return defaultSettings;
-
-    const parsedSettings = JSON.parse(decryptedSettings);
+    const decrypted = decryptData(saved);
+    const parsed = JSON.parse(decrypted);
     return {
       ...defaultSettings,
-      ...parsedSettings,
-      apiKey: parsedSettings.apiKey || ''
+      ...parsed,
     };
   } catch (error) {
-    console.error('Error getting settings:', error);
+    console.error("Error loading settings:", error);
     return defaultSettings;
   }
 };
 
 export const saveSettings = (settings: Settings): void => {
   try {
-    // Validate API key before saving
-    if (settings.apiKey && !validateApiKey(settings.apiKey)) {
-      throw new Error('Invalid API key format');
-    }
-
-    // Sanitize settings before saving
-    const sanitizedSettings = {
-      ...settings,
-      model: sanitizeInput(settings.model),
-      apiKey: settings.apiKey ? encryptData(settings.apiKey) : ''
-    };
-
-    const encryptedSettings = encryptData(JSON.stringify(sanitizedSettings));
-    localStorage.setItem('chatopia-settings', encryptedSettings);
+    const encrypted = encryptData(JSON.stringify(settings));
+    localStorage.setItem("chatopia-settings", encrypted);
   } catch (error) {
-    console.error('Error saving settings:', error);
-    throw error;
+    console.error("Error saving settings:", error);
   }
 };
 
 export const checkConnection = async (): Promise<boolean> => {
+  if (!createRateLimiter()) {
+    return false;
+  }
+
+  if (!currentSession || !validateSession(currentSession)) {
+    currentSession = createSession();
+  }
+
   try {
-    // Check rate limit
-    if (!rateLimiter()) {
-      throw new Error('Rate limit exceeded');
-    }
-
-    const settings = getSettings();
-    if (!settings.apiKey) return false;
-
-    // Validate session
-    if (!currentSession || !validateSession(currentSession)) {
-      currentSession = createSession();
-    }
-
-    const response = await fetch(`${API_URL}/health`, {
-      headers: {
-        'Authorization': `Bearer ${decryptData(settings.apiKey)}`,
-        'X-Session-ID': currentSession
-      }
-    });
+    const response = await fetch(`${API_URL}/api/health`);
     return response.ok;
   } catch (error) {
-    console.error('Connection check failed:', error);
+    console.error("Error checking connection:", error);
     return false;
   }
 };
@@ -104,7 +130,7 @@ export const checkConnection = async (): Promise<boolean> => {
 export const getModels = async (): Promise<Model[]> => {
   try {
     // Check rate limit
-    if (!rateLimiter()) {
+    if (!createRateLimiter()) {
       throw new Error('Rate limit exceeded');
     }
 
@@ -118,8 +144,8 @@ export const getModels = async (): Promise<Model[]> => {
     const response = await fetch(`${API_URL}/models`, {
       headers: {
         'Authorization': `Bearer ${decryptData(settings.apiKey)}`,
-        'X-Session-ID': currentSession,
-        'X-Token': currentToken
+        'X-Session-ID': currentSession?.id || '',
+        'X-Token': currentToken?.token || ''
       }
     });
 
@@ -144,102 +170,57 @@ export const generateCompletionStream = async (
   onChunk: (chunk: string) => void,
   onComplete: () => void,
   onError: (error: Error) => void
-): Promise<() => void> => {
+): Promise<void> => {
+  if (!createRateLimiter()) {
+    onError(new Error("Rate limit exceeded"));
+    return;
+  }
+
+  if (!currentToken || !validateToken(currentToken)) {
+    currentToken = createToken();
+  }
+
   const settings = getSettings();
-  const controller = new AbortController();
 
   try {
-    // Check rate limit
-    if (!rateLimiter()) {
-      throw new Error('Rate limit exceeded');
-    }
-
-    // Sanitize messages before sending
-    const sanitizedMessages = messages.map(msg => ({
-      ...msg,
-      content: sanitizeInput(msg.content)
-    }));
-
-    // Validate token
-    if (!currentToken || !validateToken(currentToken)) {
-      currentToken = createToken();
-    }
-
     const response = await fetch(`${API_URL}/api/chat`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${decryptData(settings.apiKey)}`,
-        'X-Session-ID': currentSession,
-        'X-Token': currentToken
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${settings.apiKey}`,
       },
       body: JSON.stringify({
-        messages: sanitizedMessages,
-        model: sanitizeInput(settings.model),
+        messages,
+        model: settings.model,
         temperature: settings.temperature,
         max_tokens: settings.maxTokens,
-        stream: true
+        stream: settings.streamingEnabled,
       }),
-      signal: controller.signal
     });
 
     if (!response.ok) {
-      throw new Error('Failed to generate completion');
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-      throw new Error('No response body');
+      throw new Error("Response body is null");
     }
 
-    const decoder = new TextDecoder();
-    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    const processStream = async () => {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+      const chunk = new TextDecoder().decode(value);
+      onChunk(chunk);
+    }
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') {
-                onComplete();
-                return;
-              }
-              try {
-                const chunk = JSON.parse(data);
-                if (chunk.choices?.[0]?.delta?.content) {
-                  onChunk(chunk.choices[0].delta.content);
-                }
-              } catch (e) {
-                console.error('Error parsing chunk:', e);
-              }
-            }
-          }
-        }
-        onComplete();
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          console.log('Stream aborted');
-        } else {
-          onError(error instanceof Error ? error : new Error('Unknown error occurred'));
-        }
-      }
-    };
-
-    processStream();
-
-    return () => {
-      controller.abort();
-    };
+    onComplete();
   } catch (error) {
-    onError(error instanceof Error ? error : new Error('Unknown error occurred'));
-    return () => {};
+    if (error instanceof Error) {
+      onError(error);
+    } else {
+      onError(new Error("Unknown error occurred"));
+    }
   }
 }; 

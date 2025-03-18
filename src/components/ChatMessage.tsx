@@ -1,17 +1,13 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
-import { Message, Preview } from "@/types/chat";
 import { User, Bot } from "lucide-react";
 
 interface ChatMessageProps {
-  role: Message["role"];
+  role: "user" | "assistant";
   content: string;
-  isLast?: boolean;
-  onPreview?: (type: Preview["type"], content: string, language?: string, title?: string) => void;
 }
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isLast, onPreview }): JSX.Element => {
+const ChatMessage: React.FC<ChatMessageProps> = ({ role, content }): JSX.Element => {
   const isUser = role === "user";
 
   return (
@@ -19,10 +15,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isLast, onPrev
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className={cn(
-        "flex gap-3 p-4",
+      className={`flex ${
         isUser ? "justify-end" : "justify-start"
-      )}
+      }`}
     >
       {!isUser && (
         <div className="flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-md border bg-background shadow">
@@ -30,12 +25,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isLast, onPrev
         </div>
       )}
       <div
-        className={cn(
-          "flex max-w-[85%] flex-col gap-2 rounded-lg px-4 py-2",
+        className={`max-w-[80%] rounded-lg p-4 ${
           isUser
             ? "bg-primary text-primary-foreground"
-            : "bg-muted text-muted-foreground"
-        )}
+            : "bg-muted"
+        }`}
       >
         <div className="prose dark:prose-invert max-w-none break-words">
           {content}

@@ -1,98 +1,72 @@
-import React from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { Settings } from "@/types/chat";
 import { getSettings, saveSettings } from "@/services/localService";
+import { useState } from "react";
 
 interface GroqSettingsDialogProps {
-  onSettingsChange: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSettingsChange: (settings: Settings) => void;
 }
 
-const GroqSettingsDialog: React.FC<GroqSettingsDialogProps> = ({ onSettingsChange }): JSX.Element => {
-  const [settings, setSettings] = React.useState<Settings>(getSettings());
-  const [isOpen, setIsOpen] = React.useState(false);
+const GroqSettingsDialog: React.FC<GroqSettingsDialogProps> = ({
+  open,
+  onOpenChange,
+  onSettingsChange,
+}) => {
+  const [settings, setSettings] = useState<Settings>(getSettings());
 
-  const handleSave = (): void => {
+  const handleSave = () => {
     saveSettings(settings);
-    onSettingsChange();
-    setIsOpen(false);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    setSettings({ ...settings, apiKey: e.target.value });
-  };
-
-  const handleTemperatureChange = (value: number[]): void => {
-    setSettings({ ...settings, temperature: value[0] });
-  };
-
-  const handleMaxTokensChange = (value: number[]): void => {
-    setSettings({ ...settings, maxTokens: value[0] });
-  };
-
-  const handleStreamingChange = (checked: boolean): void => {
-    setSettings({ ...settings, streamingEnabled: checked });
+    onSettingsChange(settings);
+    onOpenChange(false);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Label htmlFor="api-key">API Key</Label>
-        <Input
-          id="api-key"
-          type="password"
-          value={settings.apiKey}
-          onChange={handleInputChange}
-          className="w-[200px]"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="temperature">Temperature</Label>
-        <Slider
-          id="temperature"
-          min={0}
-          max={2}
-          step={0.1}
-          value={[settings.temperature]}
-          onValueChange={handleTemperatureChange}
-        />
-        <div className="text-sm text-muted-foreground">
-          {settings.temperature.toFixed(1)}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Settings</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="apiKey">API Key</Label>
+            <input
+              id="apiKey"
+              type="password"
+              value={settings.apiKey}
+              onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
+              className="w-full rounded-md border p-2"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="temperature">Temperature</Label>
+            <Slider
+              id="temperature"
+              value={[settings.temperature]}
+              onValueChange={([value]) => setSettings({ ...settings, temperature: value })}
+              min={0}
+              max={1}
+              step={0.1}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="maxTokens">Max Tokens</Label>
+            <input
+              id="maxTokens"
+              type="number"
+              value={settings.maxTokens}
+              onChange={(e) => setSettings({ ...settings, maxTokens: parseInt(e.target.value) })}
+              className="w-full rounded-md border p-2"
+            />
+          </div>
+          <Button onClick={handleSave}>Save</Button>
         </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="max-tokens">Max Tokens</Label>
-        <Slider
-          id="max-tokens"
-          min={100}
-          max={4000}
-          step={100}
-          value={[settings.maxTokens]}
-          onValueChange={handleMaxTokensChange}
-        />
-        <div className="text-sm text-muted-foreground">
-          {settings.maxTokens}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <Label htmlFor="streaming">Streaming</Label>
-        <Switch
-          id="streaming"
-          checked={settings.streamingEnabled}
-          onCheckedChange={handleStreamingChange}
-        />
-      </div>
-
-      <Button onClick={handleSave} className="w-full">
-        Save Settings
-      </Button>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

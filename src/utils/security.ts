@@ -2,7 +2,19 @@ import CryptoJS from 'crypto-js';
 import { v4 as uuidv4 } from 'uuid';
 
 const ENCRYPTION_KEY = import.meta.env.VITE_ENCRYPTION_KEY || 'your-secure-encryption-key';
-const SALT = import.meta.env.VITE_SALT || 'your-secure-salt';
+const MAX_REQUESTS_PER_MINUTE = parseInt(import.meta.env.VITE_MAX_REQUESTS_PER_MINUTE || '60');
+const SESSION_TIMEOUT = parseInt(import.meta.env.VITE_SESSION_TIMEOUT || '3600');
+const TOKEN_EXPIRY = parseInt(import.meta.env.VITE_TOKEN_EXPIRY || '86400');
+
+interface RateLimiter {
+  requests: number;
+  windowStart: number;
+}
+
+const rateLimiter: RateLimiter = {
+  requests: 0,
+  windowStart: Date.now(),
+};
 
 // Generate a secure random key
 export const generateSecureKey = (): string => {
@@ -131,36 +143,42 @@ export const sanitizeInput = (input: string): string => {
 };
 
 // Rate limiting helper
-export const createRateLimiter = (maxRequests: number, timeWindow: number) => {
-  const requests: number[] = [];
-  
-  return () => {
-    const now = Date.now();
-    requests.push(now);
-    
-    // Remove requests older than the time window
-    while (requests.length > 0 && requests[0] < now - timeWindow) {
-      requests.shift();
-    }
-    
-    return requests.length <= maxRequests;
-  };
+export const createRateLimiter = () => {
+  const now = Date.now();
+  if (now - rateLimiter.windowStart > 60000) {
+    rateLimiter.requests = 0;
+    rateLimiter.windowStart = now;
+  }
+  return rateLimiter.requests < MAX_REQUESTS_PER_MINUTE;
 };
 
 // Session management
-export const createSession = (): string => {
-  return generateSecureKey();
+export const createSession = () => {
+  const sessionId = uuidv4();
+  const sessionData = {
+    id: sessionId,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + SESSION_TIMEOUT * 1000,
+  };
+  return sessionData;
 };
 
-export const validateSession = (session: string): boolean => {
-  return session && session.length > 0;
+export const validateSession = (session: { id: string; createdAt: number; expiresAt: number }) => {
+  return Date.now() < session.expiresAt;
 };
 
 // Token management
-export const createToken = (): string => {
-  return generateSecureKey();
+export const createToken = () => {
+  const token = uuidv4();
+  const tokenData = {
+    token,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + TOKEN_EXPIRY * 1000,
+  };
+  return tokenData;
 };
 
-export const validateToken = (token: string): boolean => {
-  return token && token.length > 0;
+export const validateToken = (token: string | null): boolean => {
+  if (!token) return false;
+  return token.length > 0;
 }; 

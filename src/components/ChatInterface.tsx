@@ -17,14 +17,13 @@ import {
 } from "@/services/ollamaService";
 import ThemeToggle from "./ThemeToggle";
 import SettingsDialog from "./SettingsDialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Message } from "@/types/chat";
+import { Toaster } from "@/components/ui/sonner";
 
 const ChatInterface: React.FC = () => {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<OllamaMessage[]>(() => {
-    // Load messages from localStorage if available
-    const saved = localStorage.getItem("chatopia-messages");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [models, setModels] = useState<OllamaModel[]>([]);
@@ -101,80 +100,65 @@ const ChatInterface: React.FC = () => {
     }
   }, [models.length, selectedModel]);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!input.trim()) return;
-    if (!isConnected) {
-      toast.error("Not connected to Ollama. Please start Ollama and refresh.");
-      return;
-    }
-    
-    // Add user message
-    const userMessage: OllamaMessage = { role: "user", content: input };
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || isLoadingModels) return;
+
+    const userMessage: Message = {
+      role: "user",
+      content: input.trim(),
+    };
+
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsTyping(true);
-    
-    // Add placeholder for assistant response
-    const assistantPlaceholder: OllamaMessage = { 
-      role: "assistant", 
-      content: "" 
-    };
-    
-    setMessages((prev) => [...prev, assistantPlaceholder]);
-    
+
     try {
-      // Get all messages for context (excluding the empty placeholder)
-      const completionMessages = [...messages, userMessage];
-      
-      // Use streaming API for better UX
-      const abort = await generateCompletionStream(
+      const ollamaMessages: OllamaMessage[] = [...messages, userMessage].map(msg => ({
+        role: msg.role === "system" ? "assistant" : msg.role,
+        content: msg.content
+      }));
+
+      generateCompletionStream(
         selectedModel,
-        completionMessages,
-        // On chunk received
-        (chunk) => {
-          setMessages((prev) => {
-            const newMessages = [...prev];
-            const lastMessage = newMessages[newMessages.length - 1];
-            if (lastMessage.role === "assistant") {
-              lastMessage.content += chunk;
+        ollamaMessages,
+        (chunk: string) => {
+          setMessages((prevMessages) => {
+            const lastMessage = prevMessages[prevMessages.length - 1];
+            if (lastMessage && lastMessage.role === "assistant") {
+              return [
+                ...prevMessages.slice(0, -1),
+                { ...lastMessage, content: lastMessage.content + chunk },
+              ];
             }
-            return newMessages;
+            return [
+              ...prevMessages,
+              { role: "assistant", content: chunk },
+            ];
           });
         },
-        // On complete
         () => {
           setIsTyping(false);
           setAbortController(null);
         },
-        // On error
-        (error) => {
-          console.error("Error generating response:", error);
-          setMessages((prev) => {
-            const newMessages = [...prev];
-            // Remove the placeholder if there was an error
-            return newMessages.slice(0, -1);
-          });
+        (error: Error) => {
+          console.error("Error generating completion:", error);
+          toast.error("Failed to generate response");
           setIsTyping(false);
           setAbortController(null);
         }
       );
-      
-      setAbortController(() => abort);
     } catch (error) {
-      console.error("Error generating response:", error);
-      setMessages((prev) => prev.slice(0, -1)); // Remove placeholder
+      toast.error("Failed to generate response");
       setIsTyping(false);
     }
-  }, [input, isConnected, messages, selectedModel]);
+  }, [input, isLoadingModels, messages, selectedModel]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     // Submit on Ctrl+Enter or Cmd+Enter
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      handleSubmit(e as unknown as React.FormEvent);
+      handleSend();
     }
-  }, [handleSubmit]);
+  }, [handleSend]);
 
   const handleModelChange = useCallback((modelName: string) => {
     setSelectedModel(modelName);
@@ -266,6 +250,7 @@ const ChatInterface: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen max-h-screen bg-gray-50 dark:bg-gray-900">
+      <Toaster />
       {/* Header */}
       <header className="flex justify-between items-center border-b p-4 bg-white dark:bg-gray-800 shadow-sm">
         <div className="flex items-center space-x-2">
@@ -325,14 +310,17 @@ const ChatInterface: React.FC = () => {
           welcomeScreen
         ) : (
           // Message list
-          messages.map((message, index) => (
-            <ChatMessage
-              key={index}
-              role={message.role}
-              content={message.content}
-              isLast={index === messages.length - 1 && message.role === "assistant" && isTyping}
-            />
-          ))
+          <ScrollArea className="h-full">
+            <div className="flex flex-col gap-4 p-4">
+              {messages.map((message, index) => (
+                <ChatMessage
+                  key={index}
+                  role={message.role === "system" ? "assistant" : message.role}
+                  content={message.content}
+                />
+              ))}
+            </div>
+          </ScrollArea>
         )}
         {isTyping && messages.length === 0 && <TypingIndicator />}
         <div ref={messagesEndRef} />
@@ -340,7 +328,7 @@ const ChatInterface: React.FC = () => {
 
       {/* Input Area */}
       <div className="p-4 border-t bg-white dark:bg-gray-800 shadow-inner">
-        <form onSubmit={handleSubmit} className="flex space-x-2">
+        <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="flex space-x-2">
           <Input
             ref={inputRef}
             value={input}
@@ -348,7 +336,7 @@ const ChatInterface: React.FC = () => {
             onKeyDown={handleKeyDown}
             placeholder={isConnected ? "Type your message... (Ctrl+Enter to send)" : "Start Ollama to begin chatting..."}
             className="flex-1"
-            disabled={!isConnected}
+            disabled={!isConnected || isLoadingModels}
           />
           {isTyping ? (
             <Button 
@@ -361,7 +349,7 @@ const ChatInterface: React.FC = () => {
           ) : (
             <Button 
               type="submit" 
-              disabled={!isConnected || !input.trim()}
+              disabled={!isConnected || !input.trim() || isLoadingModels}
             >
               <SendHorizontal className="h-4 w-4 mr-2" />
               Send

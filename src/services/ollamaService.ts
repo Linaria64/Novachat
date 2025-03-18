@@ -266,9 +266,9 @@ export async function generateCompletionStream(
 
       onComplete(fullResponse);
     } catch (error) {
-      if (error.name !== "AbortError") {
+      if (error instanceof Error && error.name !== "AbortError") {
         console.error("Error in streaming completion:", error);
-        onError(error instanceof Error ? error : new Error(String(error)));
+        onError(error);
       }
     }
   })();

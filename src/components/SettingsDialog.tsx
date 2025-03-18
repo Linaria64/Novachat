@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { OllamaSettings, defaultSettings, getSettings, saveSettings, getApiUrl, getBaseUrl } from "@/services/ollamaService";
+import { OllamaSettings, defaultSettings, getSettings, saveSettings, getBaseUrl } from "@/services/ollamaService";
 
 interface SettingsDialogProps {
   onSettingsChange: () => void;
