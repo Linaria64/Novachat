@@ -1,4 +1,5 @@
 import React from "react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface TypingIndicatorProps {
@@ -14,9 +15,21 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ inline = false }) => 
       )}
     >
       <div className="flex space-x-1.5">
-        <div className="w-2.5 h-2.5 bg-blue-500 dark:bg-blue-400 rounded-full animate-typing-bounce1"></div>
-        <div className="w-2.5 h-2.5 bg-blue-500 dark:bg-blue-400 rounded-full animate-typing-bounce2"></div>
-        <div className="w-2.5 h-2.5 bg-blue-500 dark:bg-blue-400 rounded-full animate-typing-bounce3"></div>
+        <motion.div
+          className="h-2 w-2 rounded-full bg-primary"
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 1, repeat: Infinity }}
+        />
+        <motion.div
+          className="h-2 w-2 rounded-full bg-primary"
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
+        />
+        <motion.div
+          className="h-2 w-2 rounded-full bg-primary"
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
+        />
       </div>
       {!inline && <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">AI is thinking...</span>}
     </div>

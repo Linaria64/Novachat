@@ -1,48 +1,28 @@
-import { Message } from '@/types/chat';
+import { Message, Settings, Model } from "@/types/chat";
 
 const API_URL = import.meta.env.VITE_API_URL;
 const APP_ENV = import.meta.env.VITE_APP_ENV;
-
-export interface Model {
-  id: string;
-  name: string;
-  description: string;
-}
-
-export interface Settings {
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  apiKey: string;
-}
 
 const defaultSettings: Settings = {
   model: 'local-model',
   temperature: 0.7,
   maxTokens: 2000,
-  apiKey: ''
+  apiKey: '',
+  streamingEnabled: true
 };
 
 export const getSettings = (): Settings => {
-  const saved = localStorage.getItem('chatopia-settings');
-  return saved ? JSON.parse(saved) : defaultSettings;
+  const savedSettings = localStorage.getItem('chatopia-settings');
+  return savedSettings ? JSON.parse(savedSettings) : defaultSettings;
 };
 
-export const saveSettings = (settings: Settings) => {
+export const saveSettings = (settings: Settings): void => {
   localStorage.setItem('chatopia-settings', JSON.stringify(settings));
 };
 
 export const checkConnection = async (): Promise<boolean> => {
   try {
-    const settings = getSettings();
-    if (!settings.apiKey) return false;
-
-    const response = await fetch(`${API_URL}/api/health`, {
-      headers: {
-        'Authorization': `Bearer ${settings.apiKey}`
-      }
-    });
-
+    const response = await fetch(`${API_URL}/health`);
     return response.ok;
   } catch (error) {
     console.error('Connection check failed:', error);
@@ -52,21 +32,27 @@ export const checkConnection = async (): Promise<boolean> => {
 
 export const getModels = async (): Promise<Model[]> => {
   try {
-    const settings = getSettings();
-    const response = await fetch(`${API_URL}/api/models`, {
-      headers: {
-        'Authorization': `Bearer ${settings.apiKey}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch models');
-    }
-
+    const response = await fetch(`${API_URL}/models`);
+    if (!response.ok) throw new Error('Failed to fetch models');
     return await response.json();
   } catch (error) {
-    console.error('Failed to fetch models:', error);
-    return [];
+    try {
+      const settings = getSettings();
+      const response = await fetch(`${API_URL}/api/models`, {
+        headers: {
+          'Authorization': `Bearer ${settings.apiKey}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch models');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to fetch models:', error);
+      return [];
+    }
   }
 };
 
@@ -138,10 +124,10 @@ export const generateCompletionStream = async (
         }
         onComplete();
       } catch (error) {
-        if (error.name === 'AbortError') {
+        if (error instanceof Error && error.name === 'AbortError') {
           console.log('Stream aborted');
         } else {
-          onError(error as Error);
+          onError(error instanceof Error ? error : new Error('Unknown error occurred'));
         }
       }
     };
@@ -152,7 +138,7 @@ export const generateCompletionStream = async (
       controller.abort();
     };
   } catch (error) {
-    onError(error as Error);
+    onError(error instanceof Error ? error : new Error('Unknown error occurred'));
     return () => {};
   }
 }; 

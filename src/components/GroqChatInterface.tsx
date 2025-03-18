@@ -1,19 +1,18 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { SendHorizontal, Download, Trash2, MessageSquarePlus, ChevronLeft, ChevronRight, Code2, Image, FileText, Terminal, X, Mic, FilePlus, User } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Download, Trash2, MessageSquarePlus, Terminal, X, Mic, FilePlus, User, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import ChatMessage from "./ChatMessage";
-import TypingIndicator from "./TypingIndicator";
-import { motion, AnimatePresence } from "framer-motion";
-import ThemeToggle from "./ThemeToggle";
-import GroqSettingsDialog from "./GroqSettingsDialog";
-import { Message, Model, getModels, checkConnection, getSettings, generateCompletionStream } from "@/services/localService";
-import { useDevMode } from "@/hooks/useDevMode";
+import { toast } from "sonner";
+import { AnimatePresence, motion } from "framer-motion";
+import { ThemeToggle } from "@/components/theme-toggle";
+import ChatMessage from "@/components/ChatMessage";
+import TypingIndicator from "@/components/TypingIndicator";
+import GroqSettingsDialog from "@/components/GroqSettingsDialog";
+import { checkConnection, getSettings, generateCompletionStream } from "@/services/localService";
+import { Message, Settings } from "@/types/chat";
 
 interface Conversation {
   id: string;
@@ -69,6 +68,8 @@ const GroqChatInterface: React.FC = () => {
     messageCount: 0,
     lastResponseTime: 0
   });
+  const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
+  const [settings, setSettings] = useState<Settings>(getSettings());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
