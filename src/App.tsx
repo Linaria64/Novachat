@@ -1,141 +1,210 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Bot, MessageSquare, Settings, Moon, Sun, HelpCircle, Terminal, Database, FileCode } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import ChatInterface from "./components/ChatInterface";
-import { Bot, MessageSquare, Settings, Moon, Sun, HelpCircle } from "lucide-react";
-import { useTheme } from "./components/theme-provider";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./components/ui/dialog";
+import LoadingScreen from "./components/LoadingScreen";
+import "./App.css";
 
 function App() {
   const [showNavbar, setShowNavbar] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
-  const { setTheme, theme } = useTheme();
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [isDeveloperMode, setIsDeveloperMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Gérer le thème
+  useEffect(() => {
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [theme]);
 
-  const handleNewChat = () => {
-    // Créer une nouvelle conversation
-    const event = new CustomEvent('novachat:new-conversation');
-    window.dispatchEvent(event);
-  };
+  // Charger le mode développeur depuis le localStorage
+  useEffect(() => {
+    const savedDevMode = localStorage.getItem('novachat-dev-mode');
+    if (savedDevMode) {
+      setIsDeveloperMode(savedDevMode === 'true');
+    }
+  }, []);
+
+  // Sauvegarder le mode développeur dans le localStorage
+  useEffect(() => {
+    localStorage.setItem('novachat-dev-mode', isDeveloperMode.toString());
+  }, [isDeveloperMode]);
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
-  const handleChatButtonClick = () => {
-    handleNewChat();
+  const toggleDeveloperMode = () => {
+    setIsDeveloperMode(!isDeveloperMode);
   };
 
-  const handleSettingsClick = () => {
-    setShowSettingsDialog(true);
+  // Fonction pour gérer la fin du chargement
+  const handleLoadingComplete = () => {
+    setIsLoading(false);
   };
 
-  const handleHelpClick = () => {
-    setShowHelpDialog(true);
-  };
+  if (isLoading) {
+    return <LoadingScreen onLoadingComplete={handleLoadingComplete} />;
+  }
 
   return (
-    <div className="min-h-screen bg-background relative">
-      {/* Zone de détection pour afficher la navbar */}
-      <div 
-        className="absolute left-0 top-0 h-full w-16 z-20"
-        onMouseEnter={() => setShowNavbar(true)}
-      />
-
-      {/* Navbar latérale avec effet de verre */}
-      <div 
-        className={`fixed left-0 top-0 h-full w-20 bg-white/30 dark:bg-gray-900/30 backdrop-blur-md border-r border-white/20 dark:border-gray-800/30 z-30 transition-transform duration-300 ease-in-out ${
-          showNavbar ? 'translate-x-0' : '-translate-x-full'
-        }`}
-        onMouseLeave={() => setShowNavbar(false)}
-      >
-        <div className="flex flex-col items-center h-full py-8">
-          <div className="flex flex-col items-center gap-8">
-            {/* Logo */}
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              <Bot className="w-6 h-6 text-white" />
-            </div>
+    <div className="flex flex-col h-screen relative bg-background text-foreground">
+      {/* Navbar */}
+      <div className="bg-primary/10 backdrop-blur-sm py-2 px-4 sm:px-6 border-b border-border shadow-sm">
+        <div className="flex items-center justify-between">
+          {/* Logo et Menu */}
+          <div className="flex items-center space-x-3">
+            <button 
+              onClick={() => setShowNavbar(!showNavbar)}
+              className="flex items-center space-x-2 font-bold text-lg"
+            >
+              <Bot className="w-6 h-6" />
+              <span className="hidden sm:inline">NovaChat</span>
+            </button>
             
-            {/* Navigation items */}
-            <div className="flex flex-col items-center gap-6 mt-8">
-              <button 
-                className="w-10 h-10 rounded-full bg-blue-100/50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 hover:bg-blue-200/70 dark:hover:bg-blue-800/50 transition-colors"
-                onClick={handleChatButtonClick}
-                title="Nouvelle conversation"
-              >
-                <MessageSquare size={20} />
-              </button>
-              <button 
-                className="w-10 h-10 rounded-full bg-gray-100/50 dark:bg-gray-800/30 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-colors"
-                onClick={handleSettingsClick}
-                title="Paramètres"
-              >
-                <Settings size={20} />
-              </button>
-              <button 
-                className="w-10 h-10 rounded-full bg-gray-100/50 dark:bg-gray-800/30 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-colors"
-                onClick={handleHelpClick}
-                title="Aide"
-              >
-                <HelpCircle size={20} />
-              </button>
-            </div>
+            {/* Indicateur de mode */}
+            {isDeveloperMode && (
+              <span className="hidden sm:flex text-xs py-0.5 px-2 bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 rounded-full">
+                Mode développeur
+              </span>
+            )}
           </div>
           
-          {/* Theme toggle at bottom */}
-          <button 
-            className="w-10 h-10 rounded-full bg-amber-100/50 dark:bg-indigo-900/30 flex items-center justify-center text-amber-600 dark:text-indigo-400 hover:bg-amber-200/70 dark:hover:bg-indigo-800/50 transition-colors mt-auto"
-            onClick={toggleTheme}
-            title={theme === "dark" ? "Mode clair" : "Mode sombre"}
-          >
-            {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
+          {/* Boutons de droite */}
+          <div className="flex items-center space-x-1 sm:space-x-2">
+            {/* Boutons du mode développeur */}
+            {isDeveloperMode && (
+              <>
+                <button 
+                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors"
+                  title="Terminal"
+                >
+                  <Terminal className="w-5 h-5" />
+                </button>
+                <button 
+                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors"
+                  title="Base de données"
+                >
+                  <Database className="w-5 h-5" />
+                </button>
+                <button 
+                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors"
+                  title="Éditeur de code"
+                >
+                  <FileCode className="w-5 h-5" />
+                </button>
+              </>
+            )}
+            
+            {/* Boutons communs aux deux modes */}
+            <button 
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors"
+              title="Chat"
+            >
+              <MessageSquare className="w-5 h-5" />
+            </button>
+            
+            <button 
+              onClick={() => setShowHelpDialog(true)}
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors"
+              title="Aide"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </button>
+            
+            <button 
+              onClick={toggleTheme}
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors"
+              title={theme === "dark" ? "Mode clair" : "Mode sombre"}
+            >
+              {theme === "dark" ? (
+                <Sun className="w-5 h-5" />
+              ) : (
+                <Moon className="w-5 h-5" />
+              )}
+            </button>
+            
+            <button 
+              onClick={() => setShowSettingsDialog(true)}
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors"
+              title="Paramètres"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
-
-      <main className="w-full h-screen">
+      
+      {/* Contenu principal */}
+      <div className="flex-1 overflow-hidden">
         <ChatInterface />
-      </main>
-
-      {/* Dialogs */}
+      </div>
+      
+      {/* Boîte de dialogue des paramètres */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Paramètres</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-muted-foreground text-sm">
-              Configurez ici les paramètres de votre application NovaChat.
-            </p>
-            <div className="mt-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <span>Mode sombre</span>
-                <button 
-                  className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary"
-                  onClick={toggleTheme}
-                >
-                  {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-                </button>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium">Mode développeur</h4>
+                <p className="text-sm text-muted-foreground">
+                  Activer les fonctionnalités avancées
+                </p>
               </div>
-              {/* Autres options de paramètres pourraient être ajoutées ici */}
+              <Switch 
+                checked={isDeveloperMode} 
+                onCheckedChange={toggleDeveloperMode} 
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium">Mode sombre</h4>
+                <p className="text-sm text-muted-foreground">
+                  Basculer entre les thèmes clair et sombre
+                </p>
+              </div>
+              <Switch 
+                checked={theme === "dark"} 
+                onCheckedChange={toggleTheme} 
+              />
             </div>
           </div>
         </DialogContent>
       </Dialog>
-
+      
+      {/* Boîte de dialogue d'aide */}
       <Dialog open={showHelpDialog} onOpenChange={setShowHelpDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Aide</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-muted-foreground text-sm mb-4">
-              Bienvenue sur NovaChat ! Voici quelques conseils pour utiliser l'application :
+          <div className="space-y-4 py-4">
+            <h4 className="font-medium">Bienvenue sur NovaChat</h4>
+            <p className="text-sm">
+              NovaChat est un assistant IA personnel qui utilise des modèles de langage avancés pour vous aider.
             </p>
-            <ul className="space-y-2 list-disc pl-5">
-              <li>Entrez votre message dans la zone de texte en bas de l'écran</li>
-              <li>Appuyez sur Entrée ou cliquez sur l'icône d'envoi pour envoyer votre message</li>
-              <li>Pour effacer la conversation, utilisez l'icône de corbeille</li>
-              <li>Pour changer entre le mode clair et sombre, utilisez l'icône de lune/soleil dans la barre latérale</li>
+            
+            <h4 className="font-medium mt-4">Comment utiliser</h4>
+            <ul className="text-sm list-disc pl-5 space-y-1">
+              <li>Posez simplement vos questions dans la zone de texte</li>
+              <li>Utilisez le bouton + pour démarrer une nouvelle conversation</li>
+              <li>Basculez entre le mode normal et le mode développeur depuis les paramètres</li>
             </ul>
+            
+            <h4 className="font-medium mt-4">Mode développeur</h4>
+            <p className="text-sm">
+              Le mode développeur débloque des fonctionnalités avancées comme l'accès au terminal, à la base de données et à l'éditeur de code.
+            </p>
           </div>
         </DialogContent>
       </Dialog>
