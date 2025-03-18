@@ -1,6 +1,5 @@
 import React from "react";
 import { Bot } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const TypingIndicator: React.FC = () => {
   return (

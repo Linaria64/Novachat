@@ -26,7 +26,6 @@ export interface GroqResponse {
 
 // Configuration
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const API_TIMEOUT = 30000;
 const SETTINGS_KEY = "chatopia-groq-api-key";
 
 // Précharger la clé API

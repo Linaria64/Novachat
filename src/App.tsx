@@ -1,4 +1,3 @@
-import React from "react";
 import ChatInterface from "./components/ChatInterface";
 import TailwindTest from "./components/TailwindTest";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

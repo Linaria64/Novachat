@@ -1,5 +1,3 @@
-import React from 'react';
-
 const TailwindTest = () => {
   return (
     <div className="p-8 max-w-md mx-auto">

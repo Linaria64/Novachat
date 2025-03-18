@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronDown, CloudCog } from "lucide-react";
+import { CloudCog } from "lucide-react";
 import { 
   Select, 
   SelectContent, 
