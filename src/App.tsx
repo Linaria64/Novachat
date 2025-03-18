@@ -278,6 +278,11 @@ function App() {
         <ChatInterface />
       </main>
       
+      {/* Étiquette de version en bas à droite */}
+      <div className="fixed bottom-2 right-2 text-xs text-muted-foreground/60 pointer-events-none select-none z-10">
+        NovaChat v alpha 0.01
+      </div>
+      
       {/* Dialogs */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
         <DialogContent className="w-[90vw] max-w-md mx-auto">
