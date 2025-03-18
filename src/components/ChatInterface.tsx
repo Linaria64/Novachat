@@ -1,48 +1,107 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { SendHorizontal, Download, RefreshCw, Trash2 } from "lucide-react";
+import { Download, RefreshCw, Trash2, Send, Loader2, AlertCircle, Bot, Plus, Share2, LayoutList, SeparatorHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
-import ModelSelector from "./ModelSelector";
 import ConnectionStatus from "./ConnectionStatus";
-import { 
-  OllamaMessage, 
-  OllamaModel,
-  getModels, 
-  generateCompletionStream,
-  checkConnection,
-  getDisplayApiUrl
-} from "@/services/ollamaService";
+import {
+  generateCompletionStream as generateGroqCompletion,
+  checkConnection as checkGroqConnection,
+  AVAILABLE_MODELS as GROQ_MODELS
+} from "@/services/groqService";
 import ThemeToggle from "./ThemeToggle";
 import SettingsDialog from "./SettingsDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Message } from "@/types/chat";
+import { BaseMessage, MessageRole, GroqModel } from "@/types/chat";
 import { Toaster } from "@/components/ui/sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import ModelSelector from "./ModelSelector";
 
-const ChatInterface: React.FC = () => {
+interface ChatInterfaceProps {
+  className?: string;
+}
+
+const SUGGESTED_PROMPTS = [
+  "Explain quantum computing in simple terms",
+  "Write a short story about a robot finding emotions",
+  "What are the best practices for learning a new language?",
+  "Create a meal plan for a vegan athlete"
+];
+
+interface ConversationInfo {
+  id: string;
+  title: string;
+  lastMessage: string;
+  timestamp: Date;
+}
+
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<BaseMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [models, setModels] = useState<OllamaModel[]>([]);
-  const [selectedModel, setSelectedModel] = useState(() => {
-    // Load selected model from localStorage if available
-    return localStorage.getItem("chatopia-selected-model") || "llama2";
-  });
+  const [selectedModel, setSelectedModel] = useState<string>("mixtral-8x7b-32768");
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [abortController, setAbortController] = useState<(() => void) | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [models, setModels] = useState<GroqModel[]>([]);
+  const [conversations, setConversations] = useState<ConversationInfo[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string>("");
+  const [showConversationList, setShowConversationList] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Define fetchModels function before it's used
+  const fetchModels = useCallback(async () => {
+    setIsLoadingModels(true);
+    try {
+      setModels(GROQ_MODELS);
+      
+      // Set default model if none selected
+      if (!selectedModel) {
+        setSelectedModel(GROQ_MODELS[0].id);
+      }
+    } catch (error) {
+      console.error("Error fetching models:", error);
+      toast.error("Failed to fetch models");
+    } finally {
+      setIsLoadingModels(false);
+    }
+  }, [selectedModel]);
+
+  const checkConnectionStatus = useCallback(async () => {
+    try {
+      const connected = await checkGroqConnection();
+        
+      if (connected !== isConnected) {
+        setIsConnected(connected);
+        if (connected && !isConnected) {
+          fetchModels();
+          toast.success("Connected to Groq");
+        } else if (!connected && isConnected) {
+          toast.error("Lost connection to Groq");
+        }
+      }
+    } catch (error) {
+      console.error("Error checking connection:", error);
+      setIsConnected(false);
+      toast.error("Failed to check connection");
+    }
+  }, [isConnected, fetchModels]);
 
   // Save messages to localStorage when they change
   useEffect(() => {
     localStorage.setItem("chatopia-messages", JSON.stringify(messages));
   }, [messages]);
 
-  // Save selected model to localStorage when it changes
+  // Save selected model to localStorage when they change
   useEffect(() => {
     localStorage.setItem("chatopia-selected-model", selectedModel);
   }, [selectedModel]);
@@ -54,7 +113,7 @@ const ChatInterface: React.FC = () => {
     // Setup interval to check connection status
     const interval = setInterval(checkConnectionStatus, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchModels, checkConnectionStatus]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -68,42 +127,10 @@ const ChatInterface: React.FC = () => {
     }
   }, [isConnected, isTyping]);
 
-  const checkConnectionStatus = useCallback(async () => {
-    const connected = await checkConnection();
-    if (connected !== isConnected) {
-      setIsConnected(connected);
-      if (connected && !isConnected) {
-        fetchModels();
-        toast.success("Connected to Ollama");
-      }
-    }
-  }, [isConnected]);
-
-  const fetchModels = useCallback(async () => {
-    setIsLoadingModels(true);
-    try {
-      const modelList = await getModels();
-      setModels(modelList);
-      setIsConnected(true);
-      
-      // Set default model if available and none selected
-      if (modelList.length > 0 && selectedModel === "") {
-        setSelectedModel(modelList[0].name);
-      }
-    } catch (error) {
-      setIsConnected(false);
-      if (models.length > 0) {
-        toast.error("Lost connection to Ollama");
-      }
-    } finally {
-      setIsLoadingModels(false);
-    }
-  }, [models.length, selectedModel]);
-
   const handleSend = useCallback(async () => {
-    if (!input.trim() || isLoadingModels) return;
+    if (!input.trim() || isLoadingModels || !isConnected) return;
 
-    const userMessage: Message = {
+    const userMessage: BaseMessage = {
       role: "user",
       content: input.trim(),
     };
@@ -111,47 +138,45 @@ const ChatInterface: React.FC = () => {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsTyping(true);
+    setError(null);
 
     try {
-      const ollamaMessages: OllamaMessage[] = [...messages, userMessage].map(msg => ({
-        role: msg.role === "system" ? "assistant" : msg.role,
-        content: msg.content
-      }));
-
-      generateCompletionStream(
+      await generateGroqCompletion(
         selectedModel,
-        ollamaMessages,
+        [...messages, userMessage],
         (chunk: string) => {
-          setMessages((prevMessages) => {
-            const lastMessage = prevMessages[prevMessages.length - 1];
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            const lastMessage = newMessages[newMessages.length - 1];
             if (lastMessage && lastMessage.role === "assistant") {
               return [
-                ...prevMessages.slice(0, -1),
+                ...newMessages.slice(0, -1),
                 { ...lastMessage, content: lastMessage.content + chunk },
               ];
             }
             return [
-              ...prevMessages,
-              { role: "assistant", content: chunk },
+              ...newMessages,
+              { role: "assistant" as MessageRole, content: chunk },
             ];
           });
         },
         () => {
           setIsTyping(false);
-          setAbortController(null);
+          setIsLoadingModels(false);
         },
-        (error: Error) => {
-          console.error("Error generating completion:", error);
-          toast.error("Failed to generate response");
+        () => {
+          setError("Failed to generate response");
           setIsTyping(false);
-          setAbortController(null);
+          setIsLoadingModels(false);
         }
       );
     } catch (error) {
-      toast.error("Failed to generate response");
+      console.error("Error in handleSend:", error);
+      setError("Failed to generate response");
       setIsTyping(false);
+      setIsLoadingModels(false);
     }
-  }, [input, isLoadingModels, messages, selectedModel]);
+  }, [input, isLoadingModels, messages, selectedModel, isConnected]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     // Submit on Ctrl+Enter or Cmd+Enter
@@ -214,154 +239,340 @@ const ChatInterface: React.FC = () => {
     fetchModels();
   }, [checkConnectionStatus, fetchModels]);
 
+  // Generate a title for a conversation based on the first message
+  const generateConversationTitle = useCallback((content: string) => {
+    return content.length > 25 ? content.substring(0, 25) + '...' : content;
+  }, []);
+
+  // Create a new conversation
+  const createNewConversation = useCallback(() => {
+    const newId = Date.now().toString();
+    setCurrentConversationId(newId);
+    setMessages([]);
+    setInput("");
+    setError(null);
+    toast.success("New conversation started");
+  }, []);
+
+  // Save current conversation
+  const saveCurrentConversation = useCallback(() => {
+    if (messages.length === 0) return;
+    
+    const userMessage = messages.find(msg => msg.role === "user");
+    if (!userMessage) return;
+    
+    const title = generateConversationTitle(userMessage.content);
+    const lastMessage = messages[messages.length - 1].content;
+    
+    const conversation: ConversationInfo = {
+      id: currentConversationId || Date.now().toString(),
+      title,
+      lastMessage,
+      timestamp: new Date()
+    };
+    
+    setConversations(prev => {
+      const filtered = prev.filter(c => c.id !== conversation.id);
+      return [conversation, ...filtered];
+    });
+    
+    if (!currentConversationId) {
+      setCurrentConversationId(conversation.id);
+    }
+  }, [messages, currentConversationId, generateConversationTitle]);
+
+  // Load a conversation
+  const loadConversation = useCallback((id: string) => {
+    // Here you would typically load the conversation from storage
+    // For now we'll just set the ID and close the sidebar
+    setCurrentConversationId(id);
+    setShowConversationList(false);
+  }, []);
+
+  // Handle prompt suggestion click
+  const handleSuggestedPrompt = useCallback((prompt: string) => {
+    setInput(prompt);
+    inputRef.current?.focus();
+  }, []);
+
+  // Save conversation when messages change
+  useEffect(() => {
+    saveCurrentConversation();
+  }, [messages, saveCurrentConversation]);
+
+  // Handle share conversation
+  const shareConversation = useCallback(() => {
+    if (messages.length === 0) {
+      toast.info("No conversation to share");
+      return;
+    }
+    
+    const text = messages
+      .map((msg) => `${msg.role === "user" ? "You" : "AI"}: ${msg.content}`)
+      .join("\n\n");
+    
+    // Copy to clipboard as a fallback
+    navigator.clipboard.writeText(text).then(() => {
+      // Try to use the Share API if available
+      if (navigator.share) {
+        navigator.share({
+          title: 'Conversation from Chatopia',
+          text: text
+        }).catch(() => {
+          toast.success("Conversation copied to clipboard");
+        });
+      } else {
+        toast.success("Conversation copied to clipboard");
+      }
+    });
+  }, [messages]);
+
   // Memoize the welcome screen to prevent unnecessary re-renders
   const welcomeScreen = useMemo(() => {
-    const apiUrl = getDisplayApiUrl();
-    
     return (
-      <div className="h-full flex flex-col items-center justify-center text-center p-8">
-        <div className="max-w-md space-y-4">
-          <h2 className="text-2xl font-bold">Welcome to Chatopia</h2>
-          <p className="text-gray-500 dark:text-gray-400">
-            Your private and secure way to chat with locally hosted AI models.
-            {!isConnected && (
-              <span className="block mt-2 text-red-500 font-medium">
-                Please start Ollama to begin chatting.
-              </span>
-            )}
-          </p>
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            Connected to: <span className="font-mono">{apiUrl}</span>
+      <div className="h-full flex flex-col items-center justify-center p-8">
+        <div className="max-w-md w-full space-y-6">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-2">
+              <Bot className="h-8 w-8 text-primary" />
+            </div>
+            <h2 className="text-2xl font-bold">Welcome to Chatopia</h2>
+            <p className="text-muted-foreground">
+              Your private and secure way to chat with Groq AI models.
+              {!isConnected && (
+                <span className="block mt-2 text-red-500 font-medium">
+                  Please configure your Groq API key in settings to begin chatting.
+                </span>
+              )}
+            </p>
           </div>
+          
+          <div className="text-xs text-center text-muted-foreground">
+            Connected to: <span className="font-mono">Groq API</span>
+          </div>
+          
           {isConnected && (
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border text-sm text-left shadow-sm">
-              <p className="font-medium mb-2">Try asking:</p>
-              <ul className="space-y-2 text-gray-600 dark:text-gray-300">
-                <li>• Tell me about the benefits of local AI models</li>
-                <li>• Write a short story about a robot learning to cook</li>
-                <li>• Explain quantum computing like I'm five</li>
-              </ul>
+            <div className="space-y-4">
+              <div className="bg-card rounded-xl border shadow-sm p-4 text-left">
+                <p className="font-medium text-sm mb-3">Try asking:</p>
+                <div className="grid gap-2">
+                  {SUGGESTED_PROMPTS.map((prompt, i) => (
+                    <button
+                      key={i}
+                      className="text-sm px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 text-left transition-colors"
+                      onClick={() => handleSuggestedPrompt(prompt)}
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                <SeparatorHorizontal className="h-3 w-3" />
+                <span>or start typing below</span>
+                <SeparatorHorizontal className="h-3 w-3" />
+              </div>
             </div>
           )}
         </div>
       </div>
     );
-  }, [isConnected]);
+  }, [isConnected, handleSuggestedPrompt]);
+
+  // The conversation list sidebar/dialog
+  const conversationList = (
+    <Dialog open={showConversationList} onOpenChange={setShowConversationList}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Your conversations</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-1 max-h-[50vh] overflow-y-auto pr-2">
+          {conversations.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>No conversations yet</p>
+            </div>
+          ) : (
+            conversations.map((conv) => (
+              <button
+                key={conv.id}
+                className={cn(
+                  "w-full px-3 py-2 rounded-lg text-left hover:bg-muted/60 transition-colors",
+                  conv.id === currentConversationId && "bg-muted"
+                )}
+                onClick={() => loadConversation(conv.id)}
+              >
+                <div className="font-medium truncate">{conv.title}</div>
+                <div className="text-xs text-muted-foreground truncate">{conv.lastMessage}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {conv.timestamp.toLocaleDateString()}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+        <Button onClick={createNewConversation} className="w-full mt-2">
+          <Plus className="h-4 w-4 mr-2" />
+          New conversation
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
 
   return (
-    <div className="flex flex-col h-screen max-h-screen bg-gray-50 dark:bg-gray-900">
-      <Toaster />
-      {/* Header */}
-      <header className="flex justify-between items-center border-b p-4 bg-white dark:bg-gray-800 shadow-sm">
-        <div className="flex items-center space-x-2">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Chatopia
-          </h1>
-          <div className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded-full">
-            Local LLM
+    <div className={`flex flex-col h-full overflow-hidden ${className}`}>
+      {/* Header with glass effect */}
+      <div className="flex items-center gap-2 p-3 border-b bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 z-10">
+        <div className="flex items-center gap-2 flex-1">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            className="rounded-full h-9 w-9"
+            onClick={createNewConversation}
+            title="New conversation"
+          >
+            <Plus className="h-5 w-5" />
+          </Button>
+          
+          <Button 
+            variant="ghost" 
+            size="icon"
+            className="rounded-full h-9 w-9"
+            onClick={() => setShowConversationList(true)}
+            title="View conversations"
+          >
+            <LayoutList className="h-5 w-5" />
+          </Button>
+          
+          <Separator orientation="vertical" className="h-6 mx-1" />
+          
+          <div className="flex items-center gap-1">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
+              <Bot className="h-5 w-5 text-primary" />
+            </div>
+            <h1 className="text-lg font-semibold hidden md:block">Chatopia</h1>
           </div>
         </div>
         
-        <div className="flex items-center space-x-2">
-          <ConnectionStatus isConnected={isConnected} />
+        <div className="flex items-center gap-1">
           <ModelSelector
             models={models}
             selectedModel={selectedModel}
             onModelChange={handleModelChange}
             isLoading={isLoadingModels}
           />
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => fetchModels()}
-            title="Refresh models"
-            className="h-8 w-8"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={clearConversation}
-            disabled={messages.length === 0}
-            title="Clear conversation"
-            className="h-8 w-8"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={downloadConversation}
-            disabled={messages.length === 0}
-            title="Download conversation"
-            className="h-8 w-8"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-          <SettingsDialog onSettingsChange={handleSettingsChange} />
+          <ConnectionStatus isConnected={isConnected} />
           <ThemeToggle />
+          <SettingsDialog onSettingsChange={handleSettingsChange} />
         </div>
-      </header>
+      </div>
 
-      {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 pb-0">
-        {messages.length === 0 ? (
-          welcomeScreen
-        ) : (
-          // Message list
-          <ScrollArea className="h-full">
-            <div className="flex flex-col gap-4 p-4">
+      {/* Main chat area */}
+      <div className="flex-1 overflow-hidden bg-background/50 relative">
+        <ScrollArea className="h-full py-6 px-4">
+          {messages.length === 0 ? (
+            welcomeScreen
+          ) : (
+            <div className="space-y-6 max-w-3xl mx-auto pb-4">
               {messages.map((message, index) => (
                 <ChatMessage
                   key={index}
-                  role={message.role === "system" ? "assistant" : message.role}
+                  role={message.role}
                   content={message.content}
                 />
               ))}
+              {isTyping && <TypingIndicator />}
+              <div ref={messagesEndRef} />
             </div>
-          </ScrollArea>
-        )}
-        {isTyping && messages.length === 0 && <TypingIndicator />}
-        <div ref={messagesEndRef} />
+          )}
+        </ScrollArea>
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t bg-white dark:bg-gray-800 shadow-inner">
-        <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="flex space-x-2">
-          <Input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isConnected ? "Type your message... (Ctrl+Enter to send)" : "Start Ollama to begin chatting..."}
-            className="flex-1"
-            disabled={!isConnected || isLoadingModels}
-          />
-          {isTyping ? (
-            <Button 
-              type="button" 
-              onClick={stopGeneration}
-              variant="destructive"
-            >
-              Stop
-            </Button>
-          ) : (
-            <Button 
-              type="submit" 
-              disabled={!isConnected || !input.trim() || isLoadingModels}
-            >
-              <SendHorizontal className="h-4 w-4 mr-2" />
-              Send
-            </Button>
+      {/* Footer with actions and input */}
+      <div className="border-t bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 p-3">
+        <div className="flex flex-col gap-3 max-w-3xl mx-auto">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
-        </form>
-        {!isConnected && (
-          <div className="text-xs mt-2 text-red-500">
-            Not connected to Ollama. Please make sure it's running on http://localhost:11434
+          
+          <div className="flex gap-2 items-end">
+            {messages.length > 0 && (
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={clearConversation}
+                  title="Clear conversation"
+                  className="h-9 w-9"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={downloadConversation}
+                  title="Download conversation"
+                  className="h-9 w-9"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={shareConversation}
+                  title="Share conversation"
+                  className="h-9 w-9"
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            <div className="flex-1 flex bg-muted/50 rounded-md border focus-within:ring-1 focus-within:ring-primary">
+              <Input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your message..."
+                disabled={!isConnected || isTyping}
+                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+              <Button
+                onClick={handleSend}
+                disabled={!isConnected || isTyping || !input.trim()}
+                variant="ghost"
+                className="rounded-l-none h-auto"
+              >
+                {isLoadingModels ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            {isTyping && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={stopGeneration}
+                title="Stop generation"
+                className="h-9 w-9"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Render the conversation list dialog */}
+      {conversationList}
+
+      <Toaster position="top-center" />
     </div>
   );
 };

@@ -99,7 +99,11 @@ module.exports = {
         "slide-in-left": {
           "0%": { transform: "translateX(-100%)" },
           "100%": { transform: "translateX(0)" }
-        }
+        },
+        bounceDot: {
+          '0%, 80%, 100%': { transform: 'translateY(0)' },
+          '40%': { transform: 'translateY(-5px)' }
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",

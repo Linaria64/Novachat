@@ -1,3 +1,38 @@
+export type MessageRole = "user" | "assistant" | "system";
+
+export interface BaseMessage {
+  role: MessageRole;
+  content: string;
+}
+
+export interface ChatSettings {
+  apiKey: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+}
+
+export interface OllamaModel {
+  name: string;
+  size: number;
+  digest: string;
+  modified_at: string;
+  details: {
+    format: string;
+    family: string;
+    parameter_size: string;
+    quantization_level: string;
+  };
+}
+
+export interface GroqModel {
+  id: string;
+  name: string;
+  description?: string;
+  context_length?: number;
+  pricing?: string;
+}
+
 export interface Message {
   role: "user" | "assistant" | "system";
   content: string;

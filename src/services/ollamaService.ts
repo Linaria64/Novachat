@@ -1,29 +1,23 @@
 import { toast } from "sonner";
+import { BaseMessage, MessageRole, OllamaModel } from "@/types/chat";
 
-export type OllamaModel = {
-  name: string;
-  modified_at: string;
-  size: number;
-};
+const DEFAULT_API_URL = "http://localhost:11434/api";
+const API_TIMEOUT = 10000;
 
-export type OllamaMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
+export type OllamaMessage = BaseMessage;
+export type { OllamaModel };
 
-export type OllamaResponse = {
+export interface OllamaResponse {
   model: string;
   created_at: string;
   message: {
-    role: "assistant";
+    role: MessageRole;
     content: string;
   };
   done: boolean;
-};
+}
 
 // Configuration
-const DEFAULT_API_URL = "/ollama-api/api"; // Use the Vite proxy
-const API_TIMEOUT = 30000; // 30 seconds timeout
 const SETTINGS_KEY = "chatopia-settings";
 
 // Determine if we're in development or production
@@ -36,13 +30,13 @@ export function getBaseUrl(url: string): string {
     return url;
   }
   
-  // If in production or the URL is already configured for a different server, use it as is
-  if (!isDevelopment || !url.includes('localhost:11434')) {
+  // If in production, always use the proxy URL
+  if (isDevelopment) {
     return url;
   }
   
-  // Replace direct localhost URL with proxy URL
-  return url.replace('http://localhost:11434/api', '/ollama-api/api');
+  // In production, always use the proxy URL
+  return '/ollama-api/api';
 }
 
 // Settings type
@@ -142,6 +136,7 @@ export async function checkConnection(): Promise<boolean> {
     connectionStatus.isConnected = false;
     connectionStatus.lastChecked = now;
     connectionStatus.reconnectAttempts++;
+    console.error("Connection check failed:", error);
     return false;
   }
 }
@@ -209,70 +204,56 @@ export async function generateCompletion(
 // New streaming API for better UX
 export async function generateCompletionStream(
   model: string,
-  messages: OllamaMessage[],
+  messages: BaseMessage[],
   onChunk: (chunk: string) => void,
-  onComplete: (fullResponse: string) => void,
+  onComplete: () => void,
   onError: (error: Error) => void
-): Promise<() => void> {
-  const controller = new AbortController();
-  
-  (async () => {
-    try {
-      const response = await fetchWithTimeout(`${getApiUrl()}/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          stream: true,
-        }),
-        signal: controller.signal,
-      });
+): Promise<void> {
+  try {
+    const response = await fetchWithTimeout(`${getApiUrl()}/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+      }),
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Ollama API error: ${errorText}`);
-      }
+    if (!response.ok) {
+      throw new Error("Failed to generate completion");
+    }
 
-      if (!response.body) {
-        throw new Error("Response body is null");
-      }
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Failed to get response reader");
+    }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullResponse = "";
+    const decoder = new TextDecoder();
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n").filter(line => line.trim());
-        
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line);
-            if (data.message?.content) {
-              onChunk(data.message.content);
-              fullResponse += data.message.content;
-            }
-          } catch (e) {
-            console.warn("Failed to parse JSON from stream:", line);
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split("\n").filter(Boolean);
+
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line);
+          if (data.message?.content) {
+            onChunk(data.message.content);
           }
+        } catch (e) {
+          console.error("Error parsing chunk:", e);
         }
       }
-
-      onComplete(fullResponse);
-    } catch (error) {
-      if (error instanceof Error && error.name !== "AbortError") {
-        console.error("Error in streaming completion:", error);
-        onError(error);
-      }
     }
-  })();
 
-  // Return abort function
-  return () => controller.abort();
+    onComplete();
+  } catch (error) {
+    onError(error instanceof Error ? error : new Error("Unknown error"));
+  }
 }
