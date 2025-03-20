@@ -41,21 +41,73 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const [currentConversationId, setCurrentConversationId] = useState<string>("");
   const [showConversationList, setShowConversationList] = useState(false);
   const [generationMode, setGenerationMode] = useState<"normal" | "reasoning">("normal");
+  const [isInitialMessageLoading, setIsInitialMessageLoading] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Définir un message de bienvenue initial
+  // Générer un message de bienvenue via l'IA au démarrage
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          role: "assistant",
-          content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
+    const generateWelcomeMessage = async () => {
+      if (messages.length === 0 && isConnected && !isInitialMessageLoading) {
+        setIsInitialMessageLoading(true);
+        setIsTyping(true);
+        
+        try {
+          const systemPrompt = "Vous êtes l'assistant IA de NovaChat. Écrivez un message de bienvenue concis et accueillant. Présentez-vous brièvement, indiquez que vous pouvez aider avec des questions et mentionnez quelques fonctionnalités de base de l'interface comme le changement de thème ou la création d'une nouvelle conversation.";
+          
+          await generateGroqCompletion(
+            selectedModel,
+            [{ role: "system", content: systemPrompt }],
+            (chunk: string) => {
+              setMessages((prev) => {
+                if (prev.length === 0) {
+                  return [{ role: "assistant" as MessageRole, content: chunk }];
+                }
+                
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                
+                if (lastMessage && lastMessage.role === "assistant") {
+                  return [
+                    { ...lastMessage, content: lastMessage.content + chunk },
+                  ];
+                }
+                
+                return [
+                  { role: "assistant" as MessageRole, content: chunk },
+                ];
+              });
+            },
+            () => {
+              setIsTyping(false);
+              setIsInitialMessageLoading(false);
+            },
+            () => {
+              // En cas d'erreur, utiliser un message par défaut
+              setMessages([{
+                role: "assistant",
+                content: "👋 Bonjour et bienvenue sur NovaChat! Je suis votre assistant IA personnel. Comment puis-je vous aider aujourd'hui?"
+              }]);
+              setIsTyping(false);
+              setIsInitialMessageLoading(false);
+            }
+          );
+        } catch (error) {
+          console.error("Error generating welcome message:", error);
+          // Message par défaut en cas d'erreur
+          setMessages([{
+            role: "assistant",
+            content: "👋 Bonjour et bienvenue sur NovaChat! Je suis votre assistant IA personnel. Comment puis-je vous aider aujourd'hui?"
+          }]);
+          setIsTyping(false);
+          setIsInitialMessageLoading(false);
         }
-      ]);
-    }
-  }, []);
+      }
+    };
+    
+    generateWelcomeMessage();
+  }, [isConnected, messages.length, selectedModel, isInitialMessageLoading]);
 
   // Define fetchModels function before it's used
   const fetchModels = useCallback(async () => {
@@ -204,12 +256,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const clearConversation = useCallback(() => {
     if (messages.length === 0) return;
     
-    setMessages([
-      {
-        role: "assistant",
-        content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
-      }
-    ]);
+    setMessages([]);
     toast.success("Conversation cleared");
   }, []);
 
@@ -222,12 +269,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const createNewConversation = useCallback(() => {
     const newId = Date.now().toString();
     setCurrentConversationId(newId);
-    setMessages([
-      {
-        role: "assistant",
-        content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
-      }
-    ]);
+    setMessages([]);
     setInput("");
     setError(null);
     toast.success("New conversation started");
