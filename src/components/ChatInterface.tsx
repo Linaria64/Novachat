@@ -51,7 +51,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
       setMessages([
         {
           role: "assistant",
-          content: "👋 Bienvenue sur NovaChat! Je suis votre assistant IA personnel. Comment puis-je vous aider aujourd'hui?"
+          content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
         }
       ]);
     }
@@ -207,7 +207,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     setMessages([
       {
         role: "assistant",
-        content: "👋 Bienvenue sur NovaChat! Je suis votre assistant IA personnel. Comment puis-je vous aider aujourd'hui?"
+        content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
       }
     ]);
     toast.success("Conversation cleared");
@@ -225,7 +225,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     setMessages([
       {
         role: "assistant",
-        content: "👋 Bienvenue sur NovaChat! Je suis votre assistant IA personnel. Comment puis-je vous aider aujourd'hui?"
+        content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
       }
     ]);
     setInput("");
@@ -327,10 +327,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
 
   return (
     <div className={`flex flex-col h-full overflow-hidden ${className}`}>
-      {/* Main chat area with gradient background */}
-      <div className="flex-1 overflow-hidden bg-gradient-to-b from-blue-500 to-indigo-800 relative">
+      {/* Main chat area with iOS-like background */}
+      <div className="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-900 relative">
+        {/* iOS-like background pattern */}
+        <div className="absolute inset-0 opacity-10 dark:opacity-5 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMjIiIGZpbGwtb3BhY2l0eT0iMC40Ij48cGF0aCBkPSJNNTQgMTEwYzAtNi42MjcgNS4zNzMtMTIgMTItMTJzMTIgNS4zNzMgMTIgMTItNS4zNzMgMTItMTIgMTItMTItNS4zNzMtMTItMTJ6bTE4IDBjMC0zLjMxMy0yLjY4Ny02LTYtNnMtNiAyLjY4Ny02IDYgMi42ODcgNiA2IDYgNi0yLjY4NyA2LTZ6Ii8+PHBhdGggZD0iTTEyMSAxMTBjMC02LjYyNyA1LjM3My0xMiAxMi0xMnMxMiA1LjM3MyAxMiAxMi01LjM3MyAxMi0xMiAxMi0xMi01LjM3My0xMi0xMnptMTggMGMwLTMuMzEzLTIuNjg3LTYtNi02cy02IDIuNjg3LTYgNiAyLjY4NyA2IDYgNiA2LTIuNjg3IDYtNnptMTIzIDNjMC02LjYyNyA1LjM3My0xMiAxMi0xMnMxMiA1LjM3MyAxMiAxMi01LjM3MyAxMi0xMiAxMi0xMi01LjM3My0xMi0xMnptMTggMGMwLTMuMzEzLTIuNjg3LTYtNi02cy02IDIuNjg3LTYgNiAyLjY4NyA2IDYgNiA2LTIuNjg3IDYtNnp6Ii8+PC9nPjwvZz48L3N2Zz4=')]"></div>
+
         <ScrollArea className="h-full py-6 px-2 sm:px-4 pb-20">
-          <div className="space-y-6 w-full max-w-3xl mx-auto pb-24">
+          <div className="space-y-2 w-full max-w-3xl mx-auto pb-24">
             {messages.map((message, index) => (
               <ChatMessage
                 key={index}
@@ -345,7 +348,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
       </div>
 
       {/* Footer with actions and input */}
-      <div className="bg-background py-3 sm:py-4 px-4 border-t">
+      <div className="bg-gray-50 dark:bg-gray-800 py-3 sm:py-4 px-4 border-t dark:border-gray-700">
         <div className="flex flex-col gap-3 w-[95%] sm:w-[90%] md:w-[80%] lg:w-[70%] mx-auto">
           {error && (
             <Alert variant="destructive">
@@ -389,7 +392,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
               </Button>
             )}
             
-            <div className="flex-1 flex bg-white dark:bg-gray-800 rounded-full shadow-md focus-within:ring-1 focus-within:ring-primary">
+            <div className="flex-1 flex bg-white dark:bg-gray-700 rounded-full shadow-md focus-within:ring-1 focus-within:ring-primary">
               <Input
                 ref={inputRef}
                 value={input}
