@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bot, MessageSquare, Settings, Moon, Sun, HelpCircle, Terminal, Database, FileCode, Code } from "lucide-react";
+import { Bot, MessageSquare, Settings, Moon, Sun, HelpCircle, Terminal, Database, FileCode, Code, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import ChatInterface from "./components/ChatInterface";
@@ -161,6 +161,18 @@ function App() {
         onMouseEnter={() => setShowNavbar(true)}
         onClick={() => isMobile && setShowNavbar(true)}
       />
+      
+      {/* Indicateur visuel de la présence de la navbar */}
+      <div 
+        className={`fixed left-0 top-1/2 transform -translate-y-1/2 bg-primary/20 dark:bg-primary/30 backdrop-blur-sm rounded-r-md shadow-md transition-opacity duration-300 z-20 ${
+          showNavbar ? 'opacity-0' : 'opacity-100'
+        }`}
+        onClick={() => setShowNavbar(true)}
+      >
+        <div className="p-2 text-primary">
+          <ChevronRight size={20} className="animate-pulse" />
+        </div>
+      </div>
       
       {/* Navbar latérale avec effet de verre */}
       <div 
