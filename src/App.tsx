@@ -155,6 +155,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background relative">
+      {/* Barre latérale partiellement visible */}
+      <div className="fixed left-0 top-0 h-full w-1.5 bg-primary/40 dark:bg-primary/50 z-20" />
+      
       {/* Zone de détection pour afficher la navbar (plus grande sur les appareils tactiles) */}
       <div 
         className="absolute left-0 top-0 h-full md:w-16 w-8 z-20"
@@ -162,15 +165,28 @@ function App() {
         onClick={() => isMobile && setShowNavbar(true)}
       />
       
-      {/* Indicateur visuel de la présence de la navbar */}
+      {/* Indicateur visuel de la présence de la navbar - plus visible */}
       <div 
-        className={`fixed left-0 top-1/2 transform -translate-y-1/2 bg-primary/20 dark:bg-primary/30 backdrop-blur-sm rounded-r-md shadow-md transition-opacity duration-300 z-20 ${
+        className={`fixed left-0 top-1/2 transform -translate-y-1/2 bg-primary/30 dark:bg-primary/40 backdrop-blur-sm rounded-r-lg shadow-md transition-opacity duration-300 z-25 ${
           showNavbar ? 'opacity-0' : 'opacity-100'
         }`}
         onClick={() => setShowNavbar(true)}
       >
-        <div className="p-2 text-primary">
-          <ChevronRight size={20} className="animate-pulse" />
+        <div className="py-4 px-1 text-primary flex flex-col items-center">
+          <div className="w-0.5 h-10 mb-2 bg-primary/40 rounded-full"></div>
+          <ChevronRight size={24} className="animate-pulse" />
+          <div className="w-0.5 h-10 mt-2 bg-primary/40 rounded-full"></div>
+        </div>
+      </div>
+      
+      {/* Icônes partiellement visibles à gauche pour indiquer la navbar */}
+      <div className={`fixed left-0 top-1/3 transform -translate-y-1/2 z-21 transition-opacity duration-300 ${
+        showNavbar ? 'opacity-0' : 'opacity-100'
+      }`}>
+        <div className="pl-1.5 py-2">
+          <Bot className="w-4 h-4 text-primary/70 mb-5" />
+          <MessageSquare className="w-4 h-4 text-primary/70 mb-5" />
+          {isDeveloperMode && <Terminal className="w-4 h-4 text-primary/70" />}
         </div>
       </div>
       
