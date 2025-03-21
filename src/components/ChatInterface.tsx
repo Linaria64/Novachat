@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { RefreshCw, Trash2, Send, Loader2, AlertCircle, Plus, Brain, MessageCircle } from "lucide-react";
+import { RefreshCw, Trash2, Send, Loader2, AlertCircle, Plus, Brain, MessageCircle, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -8,7 +8,8 @@ import TypingIndicator from "./TypingIndicator";
 import {
   generateCompletionStream as generateGroqCompletion,
   checkConnection as checkGroqConnection,
-  AVAILABLE_MODELS as GROQ_MODELS
+  AVAILABLE_MODELS as GROQ_MODELS,
+  GroqModel
 } from "@/services/groqService";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BaseMessage, MessageRole } from "@/types/chat";
@@ -33,7 +34,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const [messages, setMessages] = useState<BaseMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>("mixtral-8x7b-32768");
+  const [selectedModel, setSelectedModel] = useState<GroqModel>(GROQ_MODELS[0]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [abortController, setAbortController] = useState<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,73 +42,70 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const [currentConversationId, setCurrentConversationId] = useState<string>("");
   const [showConversationList, setShowConversationList] = useState(false);
   const [generationMode, setGenerationMode] = useState<"normal" | "reasoning">("normal");
-  const [isInitialMessageLoading, setIsInitialMessageLoading] = useState(false);
+  const [isLoadingComplete, setIsLoadingComplete] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Générer un message de bienvenue via l'IA au démarrage
+  // Détecter si l'appareil est mobile
   useEffect(() => {
-    const generateWelcomeMessage = async () => {
-      if (messages.length === 0 && isConnected && !isInitialMessageLoading) {
-        setIsInitialMessageLoading(true);
-        setIsTyping(true);
-        
-        try {
-          const systemPrompt = "Vous êtes l'assistant IA de NovaChat. Écrivez un message de bienvenue concis et accueillant. Présentez-vous brièvement, indiquez que vous pouvez aider avec des questions et mentionnez quelques fonctionnalités de base de l'interface comme le changement de thème ou la création d'une nouvelle conversation.";
-          
-          await generateGroqCompletion(
-            selectedModel,
-            [{ role: "system", content: systemPrompt }],
-            (chunk: string) => {
-              setMessages((prev) => {
-                if (prev.length === 0) {
-                  return [{ role: "assistant" as MessageRole, content: chunk }];
-                }
-                
-                const newMessages = [...prev];
-                const lastMessage = newMessages[newMessages.length - 1];
-                
-                if (lastMessage && lastMessage.role === "assistant") {
-                  return [
-                    { ...lastMessage, content: lastMessage.content + chunk },
-                  ];
-                }
-                
-                return [
-                  { role: "assistant" as MessageRole, content: chunk },
-                ];
-              });
-            },
-            () => {
-              setIsTyping(false);
-              setIsInitialMessageLoading(false);
-            },
-            () => {
-              // En cas d'erreur, utiliser un message par défaut
-              setMessages([{
-                role: "assistant",
-                content: "👋 Bonjour et bienvenue sur NovaChat! Je suis votre assistant IA personnel. Comment puis-je vous aider aujourd'hui?"
-              }]);
-              setIsTyping(false);
-              setIsInitialMessageLoading(false);
-            }
-          );
-        } catch (error) {
-          console.error("Error generating welcome message:", error);
-          // Message par défaut en cas d'erreur
-          setMessages([{
-            role: "assistant",
-            content: "👋 Bonjour et bienvenue sur NovaChat! Je suis votre assistant IA personnel. Comment puis-je vous aider aujourd'hui?"
-          }]);
-          setIsTyping(false);
-          setIsInitialMessageLoading(false);
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // Vérifier au chargement
+    checkIfMobile();
+    
+    // Ajouter un écouteur de redimensionnement
+    window.addEventListener('resize', checkIfMobile);
+    
+    // Nettoyer l'écouteur
+    return () => window.removeEventListener('resize', checkIfMobile);
+  }, []);
+
+  // Définir un message de bienvenue initial
+  useEffect(() => {
+    if (messages.length === 0) {
+      setMessages([
+        {
+          role: "assistant",
+          content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
         }
+      ]);
+    }
+  }, []);
+
+  // Vérifier si l'application est prête (API connectée)
+  useEffect(() => {
+    // Fonction pour vérifier l'état du chargement
+    const checkIfReady = () => {
+      const isAppReady = !document.body.classList.contains('loading-active');
+      setIsLoadingComplete(isAppReady);
+      
+      // Si toujours en chargement, vérifier à nouveau dans 500ms
+      if (!isAppReady) {
+        setTimeout(checkIfReady, 500);
+      } else {
+        console.log("Application chargée - interface de chat activée");
       }
     };
     
-    generateWelcomeMessage();
-  }, [isConnected, messages.length, selectedModel, isInitialMessageLoading]);
+    // Vérifier l'état initial
+    checkIfReady();
+    
+    // Écouter l'événement global de fin de chargement
+    const handleLoadingComplete = () => {
+      console.log("Événement de fin de chargement reçu");
+      setIsLoadingComplete(true);
+    };
+    
+    window.addEventListener('novachat:loading-complete', handleLoadingComplete);
+    
+    return () => {
+      window.removeEventListener('novachat:loading-complete', handleLoadingComplete);
+    };
+  }, []);
 
   // Define fetchModels function before it's used
   const fetchModels = useCallback(async () => {
@@ -115,7 +113,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     try {
       // Set default model if none selected
       if (!selectedModel) {
-        setSelectedModel(GROQ_MODELS[0].id);
+        setSelectedModel(GROQ_MODELS[0]);
       }
     } catch (error) {
       console.error("Error fetching models:", error);
@@ -152,7 +150,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
 
   // Save selected model to localStorage when they change
   useEffect(() => {
-    localStorage.setItem("chatopia-selected-model", selectedModel);
+    localStorage.setItem("chatopia-selected-model", selectedModel.id);
   }, [selectedModel]);
 
   // Fetch models on component mount
@@ -200,7 +198,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
       }
       
       await generateGroqCompletion(
-        selectedModel,
+        selectedModel.id,
         [{ role: "system", content: systemPrompt }, ...messages, userMessage],
         (chunk: string) => {
           setMessages((prev) => {
@@ -256,7 +254,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const clearConversation = useCallback(() => {
     if (messages.length === 0) return;
     
-    setMessages([]);
+    setMessages([
+      {
+        role: "assistant",
+        content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
+      }
+    ]);
     toast.success("Conversation cleared");
   }, []);
 
@@ -269,7 +272,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const createNewConversation = useCallback(() => {
     const newId = Date.now().toString();
     setCurrentConversationId(newId);
-    setMessages([]);
+    setMessages([
+      {
+        role: "assistant",
+        content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
+      }
+    ]);
     setInput("");
     setError(null);
     toast.success("New conversation started");
@@ -390,7 +398,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
       </div>
 
       {/* Footer with actions and input */}
-      <div className="bg-gray-50 dark:bg-gray-800 py-3 sm:py-4 px-4 border-t dark:border-gray-700">
+      <div className={`bg-gray-50 dark:bg-gray-800 py-3 sm:py-4 px-4 border-t dark:border-gray-700 ${isMobile ? 'mb-16' : ''}`}>
         <div className="flex flex-col gap-3 w-[95%] sm:w-[90%] md:w-[80%] lg:w-[70%] mx-auto">
           {error && (
             <Alert variant="destructive">
@@ -406,6 +414,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
               size="sm"
               onClick={() => setGenerationMode("normal")}
               className="rounded-full"
+              disabled={!isLoadingComplete}
             >
               <MessageCircle className="h-4 w-4 mr-1" />
               Normal
@@ -415,6 +424,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
               size="sm"
               onClick={() => setGenerationMode("reasoning")}
               className="rounded-full"
+              disabled={!isLoadingComplete}
             >
               <Brain className="h-4 w-4 mr-1" />
               Reasoning
@@ -429,6 +439,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                 onClick={clearConversation}
                 title="Clear conversation"
                 className="h-9 w-9 flex-shrink-0"
+                disabled={!isLoadingComplete}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -440,22 +451,39 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type your message..."
-                disabled={!isConnected || isTyping}
+                placeholder={isLoadingComplete ? "Type your message..." : "Chargement en cours..."}
+                disabled={!isConnected || isTyping || !isLoadingComplete}
                 className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 rounded-full px-3 sm:px-4 py-2 text-sm sm:text-base"
               />
-              <Button
-                onClick={handleSend}
-                disabled={!isConnected || isTyping || !input.trim()}
-                variant="ghost"
-                className="rounded-full h-auto flex-shrink-0"
-              >
-                {isLoadingModels ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
+              
+              <div className="flex items-center pr-2">
+                {input && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setInput("")}
+                    className="h-8 w-8"
+                    disabled={isTyping || !isLoadingComplete}
+                    aria-label="Effacer la saisie"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 )}
-              </Button>
+                
+                <Button
+                  onClick={handleSend}
+                  disabled={!isConnected || isTyping || !input.trim() || !isLoadingComplete}
+                  variant="ghost"
+                  className="rounded-full h-auto flex-shrink-0"
+                >
+                  {isLoadingModels ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
             
             {isTyping && (
@@ -465,6 +493,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                 onClick={stopGeneration}
                 title="Stop generation"
                 className="h-9 w-9 flex-shrink-0"
+                disabled={!isLoadingComplete}
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>

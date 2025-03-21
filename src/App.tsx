@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bot, MessageSquare, Settings, Moon, Sun, HelpCircle, Terminal, Database, FileCode, Code } from "lucide-react";
+import { Bot, MessageSquare, Settings, Moon, Sun, HelpCircle, Terminal, Database, FileCode, Code, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import ChatInterface from "./components/ChatInterface";
@@ -98,188 +98,269 @@ function App() {
     // Créer une nouvelle conversation
     const event = new CustomEvent('novachat:new-conversation');
     window.dispatchEvent(event);
-    
-    // Sur mobile, fermer automatiquement la navbar après clic
-    if (isMobile) {
-      setShowNavbar(false);
-    }
   };
 
   const handleSettingsClick = () => {
     setShowSettingsDialog(true);
-    
-    // Sur mobile, fermer automatiquement la navbar après clic
-    if (isMobile) {
-      setShowNavbar(false);
-    }
   };
 
   const handleHelpClick = () => {
     setShowHelpDialog(true);
-    
-    // Sur mobile, fermer automatiquement la navbar après clic
-    if (isMobile) {
-      setShowNavbar(false);
-    }
   };
 
   // Fonctions simulées pour les outils de développeur
   const handleTerminalClick = () => {
     alert('Terminal (fonctionnalité à venir)');
-    
-    if (isMobile) {
-      setShowNavbar(false);
-    }
   };
 
   const handleDatabaseClick = () => {
     alert('Gestionnaire de base de données (fonctionnalité à venir)');
-    
-    if (isMobile) {
-      setShowNavbar(false);
-    }
   };
 
   const handleCodeEditorClick = () => {
     alert('Éditeur de code (fonctionnalité à venir)');
-    
-    if (isMobile) {
-      setShowNavbar(false);
-    }
   };
 
   // Si l'écran de chargement est actif
   if (isLoading || !isConnectedToGroq) {
-    return <LoadingScreen onLoadingComplete={() => null} isConnectedToGroq={isConnectedToGroq} isCheckingConnection={isCheckingConnection} />;
+    return <LoadingScreen 
+      onLoadingComplete={() => {
+        if (isConnectedToGroq) {
+          setIsLoading(false);
+          // Émettre un événement pour indiquer que le chargement est terminé
+          const event = new CustomEvent('novachat:loading-complete');
+          window.dispatchEvent(event);
+          // Ajouter une classe au body pour permettre une détection facile de l'état
+          document.body.classList.remove('loading-active');
+        }
+      }} 
+      isConnectedToGroq={isConnectedToGroq} 
+      isCheckingConnection={isCheckingConnection} 
+    />;
   }
+
+  // Marquer visuellement que l'application est chargée
+  useEffect(() => {
+    // Ajouter une classe au body pendant le chargement
+    if (isLoading || !isConnectedToGroq) {
+      document.body.classList.add('loading-active');
+    } else {
+      document.body.classList.remove('loading-active');
+      // Émission d'un événement pour indiquer que le chargement est terminé
+      const event = new CustomEvent('novachat:loading-complete');
+      window.dispatchEvent(event);
+    }
+  }, [isLoading, isConnectedToGroq]);
 
   return (
     <div className="min-h-screen bg-background relative">
-      {/* Zone de détection pour afficher la navbar (plus grande sur les appareils tactiles) */}
-      <div 
-        className="absolute left-0 top-0 h-full md:w-16 w-8 z-20"
-        onMouseEnter={() => setShowNavbar(true)}
-        onClick={() => isMobile && setShowNavbar(true)}
-      />
-      
-      {/* Navbar latérale avec effet de verre */}
-      <div 
-        className={`fixed left-0 top-0 h-full md:w-20 w-16 bg-white/30 dark:bg-gray-900/30 backdrop-blur-md border-r border-white/20 dark:border-gray-800/30 z-30 transition-transform duration-300 ease-in-out ${
-          showNavbar ? 'translate-x-0' : 'translate-x-[-65%]'
-        }`}
-        onMouseLeave={() => !isMobile && setShowNavbar(false)}
-      >
-        <div className="flex flex-col items-center h-full py-8">
-          <div className="flex flex-col items-center gap-8">
-            {/* Logo et indicateur de mode */}
-            <div 
-              className={`w-10 h-10 md:w-12 md:h-12 rounded-full transition-all duration-300 flex items-center justify-center ${
-                isDeveloperMode 
-                  ? "bg-gradient-to-br from-amber-500 to-red-600" 
-                  : "bg-gradient-to-br from-blue-500 to-purple-600"
-              }`}
-              onClick={toggleDeveloperMode}
-              title={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
-            >
-              {isDeveloperMode ? (
-                <Code className="w-5 h-5 md:w-6 md:h-6 text-white" />
-              ) : (
-                <Bot className="w-5 h-5 md:w-6 md:h-6 text-white" />
-              )}
-            </div>
-            
-            {/* Navigation items */}
-            <div className="flex flex-col items-center gap-5 md:gap-6 mt-6 md:mt-8">
-              {/* Bouton de nouvelle conversation (présent dans les deux modes) */}
-              <button 
-                className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-blue-100/50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 hover:bg-blue-200/70 dark:hover:bg-blue-800/50 transition-colors"
-                onClick={handleNewChat}
-                title="Nouvelle conversation"
-                aria-label="Nouvelle conversation"
-              >
-                <MessageSquare size={isMobile ? 18 : 20} />
-              </button>
-              
-              {/* Boutons spécifiques au mode développeur */}
-              {isDeveloperMode && (
-                <>
+      {/* Desktop Navbar - visible uniquement sur desktop */}
+      {!isMobile && (
+        <>
+          {/* Zone de détection pour afficher la navbar */}
+          <div 
+            className="absolute left-0 top-0 h-full w-16 z-20"
+            onMouseEnter={() => setShowNavbar(true)}
+          />
+          
+          {/* Navbar latérale avec effet de verre */}
+          <div 
+            className={`fixed left-0 top-0 h-full w-20 bg-white/30 dark:bg-gray-900/30 backdrop-blur-md border-r border-white/20 dark:border-gray-800/30 z-30 transition-transform duration-300 ease-in-out ${
+              showNavbar ? 'translate-x-0' : 'translate-x-[-65%]'
+            }`}
+            onMouseLeave={() => setShowNavbar(false)}
+          >
+            <div className="flex flex-col items-center h-full py-8">
+              <div className="flex flex-col items-center gap-8">
+                {/* Logo et indicateur de mode */}
+                <div 
+                  className={`w-12 h-12 rounded-full transition-all duration-300 flex items-center justify-center ${
+                    isDeveloperMode 
+                      ? "bg-gradient-to-br from-amber-500 to-red-600" 
+                      : "bg-gradient-to-br from-blue-500 to-purple-600"
+                  }`}
+                  onClick={toggleDeveloperMode}
+                  title={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
+                >
+                  {isDeveloperMode ? (
+                    <Code className="w-6 h-6 text-white" />
+                  ) : (
+                    <Bot className="w-6 h-6 text-white" />
+                  )}
+                </div>
+                
+                {/* Navigation items */}
+                <div className="flex flex-col items-center gap-6 mt-8">
+                  {/* Bouton de nouvelle conversation (présent dans les deux modes) */}
                   <button 
-                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-amber-100/50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 hover:bg-amber-200/70 dark:hover:bg-amber-800/50 transition-colors"
-                    onClick={handleTerminalClick}
-                    title="Terminal"
-                    aria-label="Terminal"
+                    className="w-10 h-10 rounded-full bg-blue-100/50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 hover:bg-blue-200/70 dark:hover:bg-blue-800/50 transition-colors"
+                    onClick={handleNewChat}
+                    title="Nouvelle conversation"
+                    aria-label="Nouvelle conversation"
                   >
-                    <Terminal size={isMobile ? 18 : 20} />
+                    <MessageSquare size={20} />
+                  </button>
+                  
+                  {/* Boutons spécifiques au mode développeur */}
+                  {isDeveloperMode && (
+                    <>
+                      <button 
+                        className="w-10 h-10 rounded-full bg-amber-100/50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 hover:bg-amber-200/70 dark:hover:bg-amber-800/50 transition-colors"
+                        onClick={handleTerminalClick}
+                        title="Terminal"
+                        aria-label="Terminal"
+                      >
+                        <Terminal size={20} />
+                      </button>
+                      
+                      <button 
+                        className="w-10 h-10 rounded-full bg-green-100/50 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 hover:bg-green-200/70 dark:hover:bg-green-800/50 transition-colors"
+                        onClick={handleDatabaseClick}
+                        title="Base de données"
+                        aria-label="Base de données"
+                      >
+                        <Database size={20} />
+                      </button>
+                      
+                      <button 
+                        className="w-10 h-10 rounded-full bg-purple-100/50 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 hover:bg-purple-200/70 dark:hover:bg-purple-800/50 transition-colors"
+                        onClick={handleCodeEditorClick}
+                        title="Éditeur de code"
+                        aria-label="Éditeur de code"
+                      >
+                        <FileCode size={20} />
+                      </button>
+                    </>
+                  )}
+                  
+                  {/* Boutons toujours présents */}
+                  <button 
+                    className="w-10 h-10 rounded-full bg-gray-100/50 dark:bg-gray-800/30 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-colors"
+                    onClick={handleSettingsClick}
+                    title="Paramètres"
+                    aria-label="Paramètres"
+                  >
+                    <Settings size={20} />
                   </button>
                   
                   <button 
-                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-green-100/50 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 hover:bg-green-200/70 dark:hover:bg-green-800/50 transition-colors"
-                    onClick={handleDatabaseClick}
-                    title="Base de données"
-                    aria-label="Base de données"
+                    className="w-10 h-10 rounded-full bg-gray-100/50 dark:bg-gray-800/30 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-colors"
+                    onClick={handleHelpClick}
+                    title="Aide"
+                    aria-label="Aide"
                   >
-                    <Database size={isMobile ? 18 : 20} />
+                    <HelpCircle size={20} />
                   </button>
-                  
-                  <button 
-                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-purple-100/50 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 hover:bg-purple-200/70 dark:hover:bg-purple-800/50 transition-colors"
-                    onClick={handleCodeEditorClick}
-                    title="Éditeur de code"
-                    aria-label="Éditeur de code"
-                  >
-                    <FileCode size={isMobile ? 18 : 20} />
-                  </button>
-                </>
-              )}
+                </div>
+              </div>
               
-              {/* Boutons toujours présents */}
+              {/* Theme toggle at bottom */}
               <button 
-                className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100/50 dark:bg-gray-800/30 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-colors"
-                onClick={handleSettingsClick}
-                title="Paramètres"
-                aria-label="Paramètres"
+                className="w-10 h-10 rounded-full bg-amber-100/50 dark:bg-indigo-900/30 flex items-center justify-center text-amber-600 dark:text-indigo-400 hover:bg-amber-200/70 dark:hover:bg-indigo-800/50 transition-colors mt-auto"
+                onClick={toggleTheme}
+                title={theme === "dark" ? "Mode clair" : "Mode sombre"}
+                aria-label={theme === "dark" ? "Mode clair" : "Mode sombre"}
               >
-                <Settings size={isMobile ? 18 : 20} />
-              </button>
-              
-              <button 
-                className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100/50 dark:bg-gray-800/30 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-colors"
-                onClick={handleHelpClick}
-                title="Aide"
-                aria-label="Aide"
-              >
-                <HelpCircle size={isMobile ? 18 : 20} />
+                {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
               </button>
             </div>
           </div>
-          
-          {/* Theme toggle at bottom */}
-          <button 
-            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-amber-100/50 dark:bg-indigo-900/30 flex items-center justify-center text-amber-600 dark:text-indigo-400 hover:bg-amber-200/70 dark:hover:bg-indigo-800/50 transition-colors mt-auto"
-            onClick={toggleTheme}
-            title={theme === "dark" ? "Mode clair" : "Mode sombre"}
-            aria-label={theme === "dark" ? "Mode clair" : "Mode sombre"}
-          >
-            {theme === "dark" ? <Sun size={isMobile ? 18 : 20} /> : <Moon size={isMobile ? 18 : 20} />}
-          </button>
-        </div>
-      </div>
-      
-      {/* Masque de fermeture pour mobile */}
-      {isMobile && showNavbar && (
-        <div
-          className="fixed inset-0 bg-transparent z-20"
-          onClick={() => setShowNavbar(false)}
-          aria-hidden="true"
-        />
+        </>
       )}
 
-      <main className="w-full h-screen">
+      <main className={`w-full ${isMobile ? 'pb-20' : 'h-screen'}`}>
         <ChatInterface />
       </main>
       
+      {/* Barre de navigation mobile en bas */}
+      {isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 h-16 bg-white/70 dark:bg-gray-900/70 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 flex items-center justify-around px-1 z-40">
+          {/* Icon pour toggle le mode (utilisateur/développeur) */}
+          <button
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+              isDeveloperMode 
+                ? "bg-gradient-to-br from-amber-500 to-red-600" 
+                : "bg-gradient-to-br from-blue-500 to-purple-600"
+            }`}
+            onClick={toggleDeveloperMode}
+            aria-label={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
+          >
+            {isDeveloperMode ? (
+              <Code className="w-5 h-5 text-white" />
+            ) : (
+              <Bot className="w-5 h-5 text-white" />
+            )}
+          </button>
+          
+          {/* Nouvelle conversation */}
+          <button
+            className="w-10 h-10 rounded-full bg-blue-100/80 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400"
+            onClick={handleNewChat}
+            aria-label="Nouvelle conversation"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+          
+          {/* Boutons conditionnels pour le mode développeur */}
+          {isDeveloperMode && (
+            <>
+              <button
+                className="w-10 h-10 rounded-full bg-amber-100/80 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400"
+                onClick={handleTerminalClick}
+                aria-label="Terminal"
+              >
+                <Terminal className="w-5 h-5" />
+              </button>
+              
+              <button
+                className="w-10 h-10 rounded-full bg-green-100/80 dark:bg-green-900/40 flex items-center justify-center text-green-600 dark:text-green-400"
+                onClick={handleDatabaseClick}
+                aria-label="Base de données"
+              >
+                <Database className="w-5 h-5" />
+              </button>
+              
+              <button
+                className="w-10 h-10 rounded-full bg-purple-100/80 dark:bg-purple-900/40 flex items-center justify-center text-purple-600 dark:text-purple-400"
+                onClick={handleCodeEditorClick}
+                aria-label="Éditeur de code"
+              >
+                <FileCode className="w-5 h-5" />
+              </button>
+            </>
+          )}
+          
+          {/* Paramètres */}
+          <button
+            className="w-10 h-10 rounded-full bg-gray-100/80 dark:bg-gray-800/40 flex items-center justify-center text-gray-600 dark:text-gray-400"
+            onClick={handleSettingsClick}
+            aria-label="Paramètres"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+          
+          {/* Aide */}
+          <button
+            className="w-10 h-10 rounded-full bg-gray-100/80 dark:bg-gray-800/40 flex items-center justify-center text-gray-600 dark:text-gray-400"
+            onClick={handleHelpClick}
+            aria-label="Aide"
+          >
+            <HelpCircle className="w-5 h-5" />
+          </button>
+          
+          {/* Thème */}
+          <button
+            className="w-10 h-10 rounded-full bg-amber-100/80 dark:bg-indigo-900/40 flex items-center justify-center text-amber-600 dark:text-indigo-400"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Mode clair" : "Mode sombre"}
+          >
+            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+        </div>
+      )}
+      
       {/* Étiquette de version en bas à droite */}
-      <div className="fixed bottom-2 right-2 text-xs text-muted-foreground/60 pointer-events-none select-none z-10">
+      <div className={`fixed ${isMobile ? 'bottom-20' : 'bottom-2'} right-2 text-xs text-muted-foreground/60 pointer-events-none select-none z-10`}>
         NovaChat v alpha 0.01
       </div>
       
@@ -343,7 +424,7 @@ function App() {
               <li>Entrez votre message dans la zone de texte en bas de l'écran</li>
               <li>Appuyez sur Entrée ou cliquez sur l'icône d'envoi pour envoyer votre message</li>
               <li>Pour effacer la conversation, utilisez l'icône de corbeille</li>
-              <li>Pour changer entre le mode clair et sombre, utilisez l'icône de lune/soleil dans la barre latérale</li>
+              <li>Pour changer entre le mode clair et sombre, utilisez l'icône de lune/soleil</li>
               {isDeveloperMode && (
                 <>
                   <li className="mt-4 text-amber-600 dark:text-amber-400 font-medium">Fonctionnalités du mode développeur :</li>
