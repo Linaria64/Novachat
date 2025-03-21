@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, X, Loader2, Bot, Brain, Trash, ChevronDown } from "lucide-react";
+import { Send, X, Bot, Brain, Trash, ChevronDown } from "lucide-react";
 import { generateGroqCompletion, checkConnection, AVAILABLE_MODELS } from "@/services/groqService";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Message } from "@/types/chat";
@@ -25,7 +25,6 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   // État du chat
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
-  const [isTyping, setIsTyping] = useState<boolean>(false);
   const [selectedMode, setSelectedMode] = useState<"normal" | "reasoning">("normal");
   const [selectedModel] = useState<string>("llama3-70b-8192"); // Remplacé Claude-3 par Llama 3.3 70B
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -81,7 +80,6 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
     
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
-    setIsTyping(false);
     
     // Créer un nouveau AbortController pour cette requête
     abortControllerRef.current = new AbortController();
@@ -181,7 +179,6 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   // Gestionnaire de saisie (typing)
   const handleTyping = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    setIsTyping(e.target.value.length > 0);
     
     // Ajuster la hauteur du textarea automatiquement
     const target = e.target;

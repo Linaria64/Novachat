@@ -6,6 +6,7 @@ import ChatInterface from "./components/ChatInterface";
 import LoadingScreen from "./components/LoadingScreen";
 import { checkConnection as checkGroqConnection } from "@/services/groqService";
 import "./App.css";
+import { toast } from "sonner";
 
 function App() {
   // États
@@ -132,21 +133,27 @@ function App() {
     alert('Éditeur de code (fonctionnalité à venir)');
   }, []);
 
-  // Gestionnaire de clics pour le mode développeur secret
+  // Fonction pour gérer les clics sur le logo (mode développeur secret)
   const handleLogoClick = useCallback(() => {
-    setDevModeClicks(prev => {
-      const newCount = prev + 1;
-      if (newCount >= 5) {
-        // Activer le mode développeur après 5 clics
+    setDevModeClicks((prev: number) => {
+      const newValue = prev + 1;
+      console.log(`Logo clicks: ${newValue} / 5${newValue === devModeClicks + 1 ? ' (compteur incrémenté)' : ''}`);
+      
+      // Si 5 clics ont été effectués, activer le mode développeur
+      if (newValue === 5) {
         setIsDeveloperMode(true);
-        return 0; // réinitialiser le compteur
+        toast.success("Mode développeur activé");
+        return 0; // Réinitialiser le compteur
       }
       
-      // Réinitialiser le compteur après 3 secondes
-      setTimeout(() => setDevModeClicks(0), 3000);
-      return newCount;
+      // Réinitialiser après 3 secondes d'inactivité
+      setTimeout(() => {
+        setDevModeClicks(0);
+      }, 3000);
+      
+      return newValue;
     });
-  }, []);
+  }, [devModeClicks]);
 
   return (
     <div className={`min-h-screen bg-background relative ${isMobile ? 'main-container' : 'overflow-hidden'}`}>
