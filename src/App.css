@@ -424,3 +424,140 @@ body {
 .nav-button:hover::before {
   opacity: 1;
 }
+
+/* Variables de couleurs pour les dégradés */
+:root {
+  --primary-gradient-from: #3b82f6;
+  --primary-gradient-to: #4f46e5;
+  --secondary-gradient-from: #f59e0b;
+  --secondary-gradient-to: #dc2626;
+  
+  --glassmorphism-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  --glassmorphism-surface: rgba(255, 255, 255, 0.25);
+  --glassmorphism-border: rgba(255, 255, 255, 0.18);
+  
+  --floating-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  --floating-shadow-hover: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.dark {
+  --glassmorphism-surface: rgba(18, 18, 29, 0.7);
+  --glassmorphism-border: rgba(38, 38, 57, 0.5);
+  --glassmorphism-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  
+  --floating-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  --floating-shadow-hover: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Effet de flottement */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.floating-effect {
+  animation: float 3s ease-in-out infinite;
+  box-shadow: var(--floating-shadow);
+}
+
+/* Effet de pulsation */
+@keyframes pulse-subtle {
+  0% {
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.2);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(79, 70, 229, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
+  }
+}
+
+/* Effet de slide-in */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Classes additionnelles pour les animations */
+.slide-in {
+  animation: slideInLeft 0.3s ease-out forwards;
+}
+
+.pulse-on-load {
+  animation: pulse-subtle 2s infinite;
+}
+
+/* Style amélioré de glassmorphism pour les boutons flottants */
+.glassmorphism-button {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: var(--glassmorphism-surface);
+  border: 1px solid var(--glassmorphism-border);
+  box-shadow: var(--glassmorphism-shadow);
+  transition: all 0.3s ease;
+}
+
+.glassmorphism-button:hover {
+  box-shadow: var(--floating-shadow-hover);
+  transform: translateY(-2px);
+}
+
+/* Styles pour les messages vides pendant la génération */
+.typing-container {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+/* Styles pour l'accessibilité */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Optimisations pour mobile */
+@media (max-width: 767px) {
+  .mobile-adjusted-padding {
+    padding: 0.75rem !important;
+  }
+  
+  .mobile-spacing {
+    margin-bottom: 5rem !important;
+  }
+}
+
+/* Accessibilité - focus visible */
+:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.dark :focus-visible {
+  outline-color: #818cf8;
+}

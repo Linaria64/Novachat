@@ -153,10 +153,21 @@ function App() {
               onMouseEnter={() => setShowNavbar(true)}
               onMouseLeave={() => setShowNavbar(false)}
             >
+              {/* Élément déclencheur transparent pour la souris */}
+              <div 
+                className="absolute top-0 -right-4 h-full w-4" 
+                onMouseEnter={() => setShowNavbar(true)}
+              />
+              
               {/* Logo et titre */}
               <div className="w-full flex justify-center items-center py-6 mb-8">
                 <div className={`flex items-center justify-center transition-all duration-300 ${showNavbar ? 'ml-0' : 'ml-14'}`}>
-                  <div className={`p-2 rounded-full transition-all ${isDeveloperMode ? "bg-gradient-to-br from-amber-500 to-red-600" : "bg-gradient-to-br from-blue-500 to-indigo-600"}`}>
+                  <div 
+                    className={`p-2 rounded-full transition-all cursor-pointer ${
+                      isDeveloperMode ? "bg-gradient-to-br from-amber-500 to-red-600" : "bg-gradient-to-br from-blue-500 to-indigo-600"
+                    }`}
+                    onClick={toggleDeveloperMode}
+                  >
                     <Bot size={28} className="text-white" />
                   </div>
                   {showNavbar && <span className="ml-3 font-bold text-lg opacity-0 animate-fadeIn" style={{ animationDelay: '0.1s', animationFillMode: 'forwards' }}>NovaChat</span>}
@@ -274,6 +285,7 @@ function App() {
                 }`}
                 onClick={toggleDeveloperMode}
                 title={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
+                aria-label={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
               >
                 {isDeveloperMode ? (
                   <Code className="h-5 w-5 text-white" />
@@ -286,6 +298,7 @@ function App() {
                 className="mobile-navbar-button bg-gradient-primary text-white"
                 onClick={handleNewChat}
                 title="Nouvelle conversation"
+                aria-label="Nouvelle conversation"
               >
                 <MessageSquare className="h-5 w-5" />
               </button>
@@ -296,6 +309,7 @@ function App() {
                     className="mobile-navbar-button bg-gradient-secondary text-white"
                     onClick={handleTerminalClick}
                     title="Terminal"
+                    aria-label="Terminal"
                   >
                     <Terminal className="h-5 w-5" />
                   </button>
@@ -304,6 +318,7 @@ function App() {
                     className="mobile-navbar-button bg-gradient-secondary text-white"
                     onClick={handleDatabaseClick}
                     title="Base de données"
+                    aria-label="Base de données"
                   >
                     <Database className="h-5 w-5" />
                   </button>
@@ -314,6 +329,7 @@ function App() {
                 className="mobile-navbar-button bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
                 onClick={handleSettingsClick}
                 title="Paramètres"
+                aria-label="Paramètres"
               >
                 <Settings className="h-5 w-5" />
               </button>
@@ -322,6 +338,7 @@ function App() {
                 className="mobile-navbar-button bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
                 onClick={toggleTheme}
                 title={theme === "dark" ? "Mode clair" : "Mode sombre"}
+                aria-label={theme === "dark" ? "Mode clair" : "Mode sombre"}
               >
                 {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </button>
@@ -329,7 +346,7 @@ function App() {
           )}
 
           <main className={`w-full ${isMobile ? 'pb-20 min-h-screen' : 'h-screen'}`}>
-            <ChatInterface className={isMobile ? 'mobile-optimized' : 'ml-8'} />
+            <ChatInterface className={isMobile ? 'mobile-optimized' : 'ml-12'} />
           </main>
           
           {/* Boîtes de dialogue */}

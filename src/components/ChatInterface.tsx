@@ -182,7 +182,13 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   const handleTyping = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     setIsTyping(e.target.value.length > 0);
-  }, []);
+    
+    // Ajuster la hauteur du textarea automatiquement
+    const target = e.target;
+    target.style.height = 'auto';
+    const newHeight = Math.min(target.scrollHeight, isMobile ? 150 : 200);
+    target.style.height = `${newHeight}px`;
+  }, [isMobile]);
   
   // Gestionnaire d'appui sur les touches
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
