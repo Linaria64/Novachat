@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { RefreshCw, Trash2, Send, Loader2, AlertCircle, Plus, Brain, MessageCircle, X } from "lucide-react";
+import { RefreshCw, Trash2, Send, Loader2, AlertCircle, Plus, Brain, MessageCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -85,9 +85,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
 
     try {
       let systemPrompt = "";
+      // Sélectionner le modèle en fonction du mode
+      let modelId = selectedModel.id;
       
-      // Ajouter un système prompt différent selon le mode
+      // En mode reasoning, utiliser Qwen 72B
       if (generationMode === "reasoning") {
+        // Trouver le modèle Qwen 72B
+        const qwenModel = GROQ_MODELS.find(model => model.id === "qwen-72b");
+        if (qwenModel) {
+          modelId = qwenModel.id;
+        }
         systemPrompt = "Vous êtes un assistant IA qui expose son raisonnement étape par étape. Pour chaque réponse, commencez par une analyse détaillée du problème, puis développez votre raisonnement de manière claire et structurée avant de donner votre conclusion finale.";
       } else {
         systemPrompt = "Vous êtes un assistant IA concis et direct. Répondez de manière claire et efficace.";
@@ -108,7 +115,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
       
       // Appeler l'API Groq pour générer une réponse
       generateGroqCompletion(
-        selectedModel.id,
+        modelId,
         [{ role: "system", content: systemPrompt }, ...messages, userMessage],
         (chunk: string) => {
           setMessages((prev) => {
@@ -505,34 +512,34 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                 className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 rounded-full px-3 sm:px-4 py-2 text-sm sm:text-base"
               />
               
-              <div className="flex items-center pr-2">
-                {input && (
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setInput("")}
-                    className="h-8 w-8"
-                    disabled={isTyping || !isLoadingComplete}
-                    aria-label="Effacer la saisie"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-                
-                <Button
-                  onClick={handleSend}
-                  disabled={!isConnected || isTyping || !input.trim() || !isLoadingComplete}
-                  variant="ghost"
-                  className="rounded-full h-auto flex-shrink-0"
-                >
-                  {isLoadingModels ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
+              <div className="hidden sm:flex items-center px-2 text-xs text-gray-500 dark:text-gray-400 border-l border-gray-200 dark:border-gray-600">
+                <div className={`w-2 h-2 rounded-full mr-2 ${
+                  isConnected 
+                    ? isTyping 
+                      ? "bg-yellow-400 animate-pulse" 
+                      : "bg-green-500" 
+                    : "bg-red-500"
+                }`}></div>
+                <span>
+                  {generationMode === "reasoning" 
+                    ? "Qwen-72B" 
+                    : selectedModel.name.split(' ')[0]}
+                </span>
               </div>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleSend}
+                disabled={!isConnected || !input.trim() || isTyping || !isLoadingComplete || isLoadingModels}
+                className="rounded-r-full h-9 w-9"
+              >
+                {isTyping || isLoadingModels ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
             </div>
             
             {isTyping && (
@@ -547,6 +554,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                 <RefreshCw className="h-4 w-4" />
               </Button>
             )}
+          </div>
+
+          {/* Version mobile de l'indicateur */}
+          <div className="flex sm:hidden items-center justify-center mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <div className={`w-2 h-2 rounded-full mr-2 ${
+              isConnected 
+                ? isTyping 
+                  ? "bg-yellow-400 animate-pulse" 
+                  : "bg-green-500" 
+                : "bg-red-500"
+            }`}></div>
+            <span>
+              {generationMode === "reasoning" 
+                ? "Qwen-72B" 
+                : selectedModel.name.split(' ')[0]}
+            </span>
           </div>
         </div>
       </div>
