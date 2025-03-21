@@ -159,111 +159,108 @@ function App() {
       {/* Desktop Navbar - visible uniquement sur desktop */}
       {!isMobile && (
         <>
-          {/* Zone de détection pour afficher la navbar */}
+          {/* Navbar latérale semi-visible avec effet de glassmorphism */}
           <div 
-            className="absolute left-0 top-0 h-full w-16 z-20"
-            onMouseEnter={() => setShowNavbar(true)}
-          />
-          
-          {/* Navbar latérale avec effet de verre */}
-          <div 
-            className={`fixed left-0 top-0 h-full w-20 bg-white/30 dark:bg-gray-900/30 backdrop-blur-md border-r border-white/20 dark:border-gray-800/30 z-30 transition-transform duration-300 ease-in-out ${
-              showNavbar ? 'translate-x-0' : 'translate-x-[-65%]'
+            className={`fixed left-0 top-0 h-full w-24 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-r border-white/20 dark:border-gray-800/30 z-30 transition-all duration-300 ease-in-out shadow-md ${
+              showNavbar ? 'translate-x-0 w-64' : 'translate-x-[-50%]'
             }`}
+            onMouseEnter={() => setShowNavbar(true)}
             onMouseLeave={() => setShowNavbar(false)}
           >
-            <div className="flex flex-col items-center h-full py-8">
-              <div className="flex flex-col items-center gap-8">
-                {/* Logo et indicateur de mode */}
-                <div 
-                  className={`w-12 h-12 rounded-full transition-all duration-300 flex items-center justify-center ${
-                    isDeveloperMode 
-                      ? "bg-gradient-to-br from-amber-500 to-red-600" 
-                      : "bg-gradient-to-br from-blue-500 to-purple-600"
-                  }`}
-                  onClick={toggleDeveloperMode}
-                  title={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
-                >
-                  {isDeveloperMode ? (
-                    <Code className="w-6 h-6 text-white" />
-                  ) : (
-                    <Bot className="w-6 h-6 text-white" />
-                  )}
-                </div>
-                
-                {/* Navigation items */}
-                <div className="flex flex-col items-center gap-6 mt-8">
-                  {/* Bouton de nouvelle conversation (présent dans les deux modes) */}
-                  <button 
-                    className="w-10 h-10 rounded-full bg-blue-100/50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 hover:bg-blue-200/70 dark:hover:bg-blue-800/50 transition-colors"
-                    onClick={handleNewChat}
-                    title="Nouvelle conversation"
-                    aria-label="Nouvelle conversation"
-                  >
-                    <MessageSquare size={20} />
-                  </button>
-                  
-                  {/* Boutons spécifiques au mode développeur */}
-                  {isDeveloperMode && (
-                    <>
-                      <button 
-                        className="w-10 h-10 rounded-full bg-amber-100/50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 hover:bg-amber-200/70 dark:hover:bg-amber-800/50 transition-colors"
-                        onClick={handleTerminalClick}
-                        title="Terminal"
-                        aria-label="Terminal"
-                      >
-                        <Terminal size={20} />
-                      </button>
-                      
-                      <button 
-                        className="w-10 h-10 rounded-full bg-green-100/50 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 hover:bg-green-200/70 dark:hover:bg-green-800/50 transition-colors"
-                        onClick={handleDatabaseClick}
-                        title="Base de données"
-                        aria-label="Base de données"
-                      >
-                        <Database size={20} />
-                      </button>
-                      
-                      <button 
-                        className="w-10 h-10 rounded-full bg-purple-100/50 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 hover:bg-purple-200/70 dark:hover:bg-purple-800/50 transition-colors"
-                        onClick={handleCodeEditorClick}
-                        title="Éditeur de code"
-                        aria-label="Éditeur de code"
-                      >
-                        <FileCode size={20} />
-                      </button>
-                    </>
-                  )}
-                  
-                  {/* Boutons toujours présents */}
-                  <button 
-                    className="w-10 h-10 rounded-full bg-gray-100/50 dark:bg-gray-800/30 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-colors"
-                    onClick={handleSettingsClick}
-                    title="Paramètres"
-                    aria-label="Paramètres"
-                  >
-                    <Settings size={20} />
-                  </button>
-                  
-                  <button 
-                    className="w-10 h-10 rounded-full bg-gray-100/50 dark:bg-gray-800/30 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-colors"
-                    onClick={handleHelpClick}
-                    title="Aide"
-                    aria-label="Aide"
-                  >
-                    <HelpCircle size={20} />
-                  </button>
-                </div>
+            {/* Logo en haut de la barre latérale */}
+            <div className="w-full flex justify-center items-center py-4 mb-6">
+              <div className={`flex items-center justify-center transition-all duration-300 ${showNavbar ? 'ml-0' : 'ml-12'}`}>
+                <Bot size={32} className="text-primary" />
+                {showNavbar && <span className="ml-2 font-bold text-lg">NovaChat</span>}
               </div>
-              
-              {/* Theme toggle at bottom */}
+            </div>
+
+            {/* Conteneur des boutons avec espacement uniforme */}
+            <div className="flex flex-col items-center gap-6 mt-8">
+              {/* Bouton de nouvelle conversation (présent dans les deux modes) */}
               <button 
-                className="w-10 h-10 rounded-full bg-amber-100/50 dark:bg-indigo-900/30 flex items-center justify-center text-amber-600 dark:text-indigo-400 hover:bg-amber-200/70 dark:hover:bg-indigo-800/50 transition-colors mt-auto"
-                onClick={toggleTheme}
-                title={theme === "dark" ? "Mode clair" : "Mode sombre"}
-                aria-label={theme === "dark" ? "Mode clair" : "Mode sombre"}
+                className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-blue-100/80 to-blue-200/50 dark:from-blue-900/30 dark:to-blue-800/20 flex items-center justify-start text-blue-600 dark:text-blue-400 hover:bg-blue-200/70 dark:hover:bg-blue-800/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
+                onClick={handleNewChat}
+                title="Nouvelle conversation"
+                aria-label="Nouvelle conversation"
               >
-                {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+                <MessageSquare size={20} className="flex-shrink-0" />
+                {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Nouvelle conversation</span>}
+              </button>
+              
+              {/* Boutons spécifiques au mode développeur */}
+              {isDeveloperMode && (
+                <>
+                  <button 
+                    className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-amber-100/80 to-amber-200/50 dark:from-amber-900/30 dark:to-amber-800/20 flex items-center justify-start text-amber-600 dark:text-amber-400 hover:bg-amber-200/70 dark:hover:bg-amber-800/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
+                    onClick={handleTerminalClick}
+                    title="Terminal"
+                    aria-label="Terminal"
+                  >
+                    <Terminal size={20} className="flex-shrink-0" />
+                    {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Terminal</span>}
+                  </button>
+                  
+                  <button 
+                    className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-green-100/80 to-green-200/50 dark:from-green-900/30 dark:to-green-800/20 flex items-center justify-start text-green-600 dark:text-green-400 hover:bg-green-200/70 dark:hover:bg-green-800/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
+                    onClick={handleDatabaseClick}
+                    title="Base de données"
+                    aria-label="Base de données"
+                  >
+                    <Database size={20} className="flex-shrink-0" />
+                    {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Base de données</span>}
+                  </button>
+                  
+                  <button 
+                    className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-purple-100/80 to-purple-200/50 dark:from-purple-900/30 dark:to-purple-800/20 flex items-center justify-start text-purple-600 dark:text-purple-400 hover:bg-purple-200/70 dark:hover:bg-purple-800/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
+                    onClick={handleCodeEditorClick}
+                    title="Éditeur de code"
+                    aria-label="Éditeur de code"
+                  >
+                    <FileCode size={20} className="flex-shrink-0" />
+                    {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Éditeur de code</span>}
+                  </button>
+                </>
+              )}
+              
+              {/* Boutons toujours présents */}
+              <button 
+                className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-gray-100/80 to-gray-200/50 dark:from-gray-800/30 dark:to-gray-700/20 flex items-center justify-start text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
+                onClick={handleSettingsClick}
+                title="Paramètres"
+                aria-label="Paramètres"
+              >
+                <Settings size={20} className="flex-shrink-0" />
+                {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Paramètres</span>}
+              </button>
+              
+              <button 
+                className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-blue-100/80 to-blue-200/50 dark:from-blue-900/30 dark:to-blue-800/20 flex items-center justify-start text-blue-600 dark:text-blue-400 hover:bg-blue-200/70 dark:hover:bg-blue-800/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
+                onClick={handleHelpClick}
+                title="Aide"
+                aria-label="Aide"
+              >
+                <HelpCircle size={20} className="flex-shrink-0" />
+                {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Aide</span>}
+              </button>
+              
+              <button 
+                className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-gray-100/80 to-gray-200/50 dark:from-gray-800/30 dark:to-gray-700/20 flex items-center justify-start text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
+                onClick={toggleTheme}
+                title={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
+                aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
+              >
+                {theme === 'dark' ? (
+                  <>
+                    <Sun size={20} className="flex-shrink-0" />
+                    {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Mode clair</span>}
+                  </>
+                ) : (
+                  <>
+                    <Moon size={20} className="flex-shrink-0" />
+                    {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Mode sombre</span>}
+                  </>
+                )}
               </button>
             </div>
           </div>
