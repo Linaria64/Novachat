@@ -27,7 +27,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   const [input, setInput] = useState<string>("");
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [selectedMode, setSelectedMode] = useState<"normal" | "reasoning">("normal");
-  const [selectedModel] = useState<string>("claude-3-opus-20240229"); // On utilise uniquement la valeur, pas le setter
+  const [selectedModel] = useState<string>("llama3-70b-8192"); // Remplacé Claude-3 par Llama 3.3 70B
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isLoadingComplete, setIsLoadingComplete] = useState<boolean>(false);
@@ -279,7 +279,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   // Déterminer le modèle affiché
   const displayModel = selectedMode === "reasoning" 
     ? "Qwen-32B" 
-    : "Claude-3";
+    : "Llama 3.3-70B";
 
   return (
     <div className={cn("h-screen flex flex-col p-4", className)}>
@@ -396,7 +396,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
             </div>
             <div className="model-badge">
               <span className="hidden sm:inline">{displayModel}</span>
-              <span className="sm:hidden">{selectedMode === "reasoning" ? "Qwen" : "Claude"}</span>
+              <span className="sm:hidden">{selectedMode === "reasoning" ? "Qwen" : "Llama"}</span>
             </div>
           </div>
           
