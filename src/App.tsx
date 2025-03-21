@@ -274,10 +274,10 @@ function App() {
       
       {/* Barre de navigation mobile en bas */}
       {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 h-16 bg-white/70 dark:bg-gray-900/70 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 flex items-center justify-around px-1 z-40">
+        <div className="mobile-navbar mobile-navbar-enter">
           {/* Icon pour toggle le mode (utilisateur/développeur) */}
           <button
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+            className={`mobile-navbar-button transition-all ${
               isDeveloperMode 
                 ? "bg-gradient-to-br from-amber-500 to-red-600" 
                 : "bg-gradient-to-br from-blue-500 to-purple-600"
@@ -294,7 +294,7 @@ function App() {
           
           {/* Nouvelle conversation */}
           <button
-            className="w-10 h-10 rounded-full bg-blue-100/80 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400"
+            className="mobile-navbar-button bg-blue-100/80 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"
             onClick={handleNewChat}
             aria-label="Nouvelle conversation"
           >
@@ -305,7 +305,7 @@ function App() {
           {isDeveloperMode && (
             <>
               <button
-                className="w-10 h-10 rounded-full bg-amber-100/80 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400"
+                className="mobile-navbar-button bg-amber-100/80 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400"
                 onClick={handleTerminalClick}
                 aria-label="Terminal"
               >
@@ -313,7 +313,7 @@ function App() {
               </button>
               
               <button
-                className="w-10 h-10 rounded-full bg-green-100/80 dark:bg-green-900/40 flex items-center justify-center text-green-600 dark:text-green-400"
+                className="mobile-navbar-button bg-green-100/80 dark:bg-green-900/40 text-green-600 dark:text-green-400"
                 onClick={handleDatabaseClick}
                 aria-label="Base de données"
               >
@@ -321,7 +321,7 @@ function App() {
               </button>
               
               <button
-                className="w-10 h-10 rounded-full bg-purple-100/80 dark:bg-purple-900/40 flex items-center justify-center text-purple-600 dark:text-purple-400"
+                className="mobile-navbar-button bg-purple-100/80 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400"
                 onClick={handleCodeEditorClick}
                 aria-label="Éditeur de code"
               >
@@ -332,7 +332,7 @@ function App() {
           
           {/* Paramètres */}
           <button
-            className="w-10 h-10 rounded-full bg-gray-100/80 dark:bg-gray-800/40 flex items-center justify-center text-gray-600 dark:text-gray-400"
+            className="mobile-navbar-button bg-gray-100/80 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400"
             onClick={handleSettingsClick}
             aria-label="Paramètres"
           >
@@ -341,7 +341,7 @@ function App() {
           
           {/* Aide */}
           <button
-            className="w-10 h-10 rounded-full bg-gray-100/80 dark:bg-gray-800/40 flex items-center justify-center text-gray-600 dark:text-gray-400"
+            className="mobile-navbar-button bg-gray-100/80 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400"
             onClick={handleHelpClick}
             aria-label="Aide"
           >
@@ -350,7 +350,7 @@ function App() {
           
           {/* Thème */}
           <button
-            className="w-10 h-10 rounded-full bg-amber-100/80 dark:bg-indigo-900/40 flex items-center justify-center text-amber-600 dark:text-indigo-400"
+            className="mobile-navbar-button bg-amber-100/80 dark:bg-indigo-900/40 text-amber-600 dark:text-indigo-400"
             onClick={toggleTheme}
             aria-label={theme === "dark" ? "Mode clair" : "Mode sombre"}
           >
