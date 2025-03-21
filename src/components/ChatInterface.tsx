@@ -470,12 +470,13 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
           )}>
             {isMobile && (
               <div className="mobile-status-bar">
-                <div className={`status-indicator status-${connectionStatus}`}>
-                  <span className={`status-dot ${connectionStatus}`}></span>
-                  <span className="text-xs">{statusMessage[connectionStatus]}</span>
-                </div>
-                <div className="model-badge">
-                  <span>{selectedMode === "reasoning" ? "Qwen" : "Llama"}</span>
+                <div className="flex items-center justify-center w-full p-2 border-b border-gray-200 dark:border-gray-800 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+                  <div className="flex items-center gap-2">
+                    <span className={`status-dot ${connectionStatus}`}></span>
+                    <span className="text-sm font-medium">{statusMessage[connectionStatus]}</span>
+                    <span className="mx-2">•</span>
+                    <span className="text-sm font-medium">{selectedMode === "reasoning" ? "Qwen" : "Llama 3"}</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -586,7 +587,10 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
           </div>
         )}
         
-        <div className={cn(isMobile && "mobile-input-container")}>
+        <div className={cn(
+          "relative flex items-center rounded-xl border bg-background",
+          isMobile ? "mobile-input-container" : "p-1 mt-2"
+        )}>
           <Textarea
             ref={inputRef}
             value={input}
@@ -598,42 +602,34 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
                 : `Message ${selectedMode === "reasoning" ? "(mode reasoning)" : ""}`
             }
             className={cn(
-              "chat-input min-h-[60px] resize-none py-3",
-              isMobile && "mobile-chat-input"
+              "chat-input resize-none py-3 pr-12 border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+              isMobile ? "mobile-chat-input" : "min-h-[60px]"
             )}
             disabled={!isLoadingComplete || isGenerating}
             rows={1}
             data-mode={selectedMode}
           />
           
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={handleSend}
-            disabled={!input.trim() || !isLoadingComplete || isGenerating}
-            className={cn(
-              "h-10 w-10 rounded-full bg-gradient-primary text-white disabled:opacity-50 disabled:pointer-events-none hover:opacity-90",
-              isMobile && "mobile-send-button"
-            )}
-          >
-            {isGenerating ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Send className="h-5 w-5" />
-            )}
-          </Button>
-          
-          {(isGenerating || (isTyping && isMobile)) && (
+          {isGenerating ? (
             <Button
+              onClick={abortFunction}
               size="icon"
               variant="ghost"
-              onClick={isGenerating ? abortFunction : () => setInput("")}
-              className={cn(
-                "absolute right-12 bottom-3 h-8 w-8 rounded-full", 
-                isMobile && "bottom-[0.35rem] right-[3.25rem]"
-              )}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 rounded-full"
             >
-              <X className={cn("h-5 w-5", isGenerating ? "text-red-500" : "text-gray-400")} />
+              <X className="h-4 w-4 text-destructive" />
+              <span className="sr-only">Stop generating</span>
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || !isConnected || !isLoadingComplete}
+              size="icon"
+              variant="ghost"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Send className="h-4 w-4" />
+              <span className="sr-only">Send message</span>
             </Button>
           )}
         </div>
