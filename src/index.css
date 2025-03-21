@@ -209,12 +209,25 @@
 
   /* Mobile navigation */
   .mobile-navbar {
-    @apply fixed bottom-4 left-1/2 transform -translate-x-1/2 flex flex-row items-center gap-2 p-1.5 z-40 glassmorphism rounded-full border border-gray-300/30 dark:border-gray-700/30 shadow-lg;
+    @apply fixed bottom-8 left-1/2 transform -translate-x-1/2 flex flex-row items-center justify-center gap-2 p-1.5 z-40 glassmorphism rounded-full border border-gray-300/30 dark:border-gray-700/30 shadow-lg;
     animation: slideUp 0.5s ease-out forwards;
+    max-width: 90%;
+    padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+    width: auto;
   }
 
   .mobile-navbar-button {
     @apply w-10 h-10 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 hover:scale-105 active:scale-95;
+  }
+
+  /* Ensure chat input is positioned correctly on mobile */
+  @media (max-width: 767px) {
+    .chat-input-container {
+      @apply pb-20; /* Space for the mobile navbar */
+      padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0.5rem));
+      position: relative;
+      z-index: 30;
+    }
   }
 
   .chat-message {

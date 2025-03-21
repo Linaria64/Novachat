@@ -387,141 +387,139 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
         )}
       </div>
       
-      <div className="relative">
-        <div className="chat-input-container">
-          <div className="flex items-center gap-2 px-2">
-            <div className={`status-indicator status-${connectionStatus}`}>
-              <span className={`status-dot ${connectionStatus}`}></span>
-              <span className="hidden sm:inline text-xs">{statusMessage[connectionStatus]}</span>
-            </div>
-            <div className="model-badge">
-              <span className="hidden sm:inline">{displayModel}</span>
-              <span className="sm:hidden">{selectedMode === "reasoning" ? "Qwen" : "Llama"}</span>
-            </div>
+      <div className="relative chat-input-container">
+        <div className="flex items-center gap-2 px-2">
+          <div className={`status-indicator status-${connectionStatus}`}>
+            <span className={`status-dot ${connectionStatus}`}></span>
+            <span className="hidden sm:inline text-xs">{statusMessage[connectionStatus]}</span>
           </div>
-          
-          <Textarea
-            ref={inputRef}
-            value={input}
-            onChange={handleTyping}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              !isLoadingComplete
-                ? "Chargement..."
-                : `Message ${selectedMode === "reasoning" ? "(mode reasoning)" : ""}`
-            }
-            className="chat-input min-h-[60px] resize-none py-3"
-            disabled={!isLoadingComplete || isGenerating}
-            rows={1}
-            data-mode={selectedMode}
-          />
-          
-          <div className="absolute right-2 bottom-3 flex items-center gap-2">
-            {isGenerating ? (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={abortFunction}
-                className="h-8 w-8 rounded-full"
-              >
-                <X className="h-5 w-5 text-red-500" />
-              </Button>
-            ) : (
-              isTyping && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => setInput("")}
-                  className="h-8 w-8 rounded-full"
-                >
-                  <X className="h-5 w-5 text-gray-400" />
-                </Button>
-              )
-            )}
-            
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={handleSend}
-              disabled={!input.trim() || !isLoadingComplete || isGenerating}
-              className="h-10 w-10 rounded-full bg-gradient-primary text-white disabled:opacity-50 disabled:pointer-events-none hover:opacity-90"
-            >
-              {isGenerating ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Send className="h-5 w-5" />
-              )}
-            </Button>
+          <div className="model-badge">
+            <span className="hidden sm:inline">{displayModel}</span>
+            <span className="sm:hidden">{selectedMode === "reasoning" ? "Qwen" : "Llama"}</span>
           </div>
         </div>
         
-        {messages.length > 0 && (
+        <Textarea
+          ref={inputRef}
+          value={input}
+          onChange={handleTyping}
+          onKeyDown={handleKeyDown}
+          placeholder={
+            !isLoadingComplete
+              ? "Chargement..."
+              : `Message ${selectedMode === "reasoning" ? "(mode reasoning)" : ""}`
+          }
+          className="chat-input min-h-[60px] resize-none py-3"
+          disabled={!isLoadingComplete || isGenerating}
+          rows={1}
+          data-mode={selectedMode}
+        />
+        
+        <div className="absolute right-2 bottom-3 flex items-center gap-2">
+          {isGenerating ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={abortFunction}
+              className="h-8 w-8 rounded-full"
+            >
+              <X className="h-5 w-5 text-red-500" />
+            </Button>
+          ) : (
+            isTyping && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setInput("")}
+                className="h-8 w-8 rounded-full"
+              >
+                <X className="h-5 w-5 text-gray-400" />
+              </Button>
+            )
+          )}
+          
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={handleSend}
+            disabled={!input.trim() || !isLoadingComplete || isGenerating}
+            className="h-10 w-10 rounded-full bg-gradient-primary text-white disabled:opacity-50 disabled:pointer-events-none hover:opacity-90"
+          >
+            {isGenerating ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
+          </Button>
+        </div>
+      </div>
+      
+      {messages.length > 0 && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={clearMessages}
+                className="absolute right-0 -top-12 h-9 w-9 rounded-full"
+              >
+                <Trash className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Vider la conversation</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+      
+      {/* Button to switch modes */}
+      {messages.length > 0 && (
+        <div className="absolute left-0 -top-12 flex gap-2">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={clearMessages}
-                  className="absolute right-0 -top-12 h-9 w-9 rounded-full"
+                  variant={selectedMode === "normal" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleModeChange("normal")}
+                  className={cn(
+                    "h-9 px-3",
+                    selectedMode === "normal" && "bg-gradient-primary"
+                  )}
                 >
-                  <Trash className="h-4 w-4" />
+                  <Bot className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="text-xs">Vider la conversation</p>
+                <p className="text-xs">Mode normal</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        )}
-        
-        {/* Button to switch modes */}
-        {messages.length > 0 && (
-          <div className="absolute left-0 -top-12 flex gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={selectedMode === "normal" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleModeChange("normal")}
-                    className={cn(
-                      "h-9 px-3",
-                      selectedMode === "normal" && "bg-gradient-primary"
-                    )}
-                  >
-                    <Bot className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">Mode normal</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={selectedMode === "reasoning" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleModeChange("reasoning")}
-                    className={cn(
-                      "h-9 px-3",
-                      selectedMode === "reasoning" && "bg-gradient-secondary"
-                    )}
-                  >
-                    <Brain className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">Mode reasoning</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        )}
-      </div>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={selectedMode === "reasoning" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleModeChange("reasoning")}
+                  className={cn(
+                    "h-9 px-3",
+                    selectedMode === "reasoning" && "bg-gradient-secondary"
+                  )}
+                >
+                  <Brain className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Mode reasoning</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
     </div>
   );
 };

@@ -328,7 +328,7 @@ function App() {
             </div>
           )}
 
-          <main className={`w-full ${isMobile ? 'pb-20' : 'h-screen'}`}>
+          <main className={`w-full ${isMobile ? 'pb-24' : 'h-screen'}`}>
             <ChatInterface className={isMobile ? '' : 'ml-8'} />
           </main>
           
