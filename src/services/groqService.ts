@@ -36,7 +36,7 @@ if (!localStorage.getItem(SETTINGS_KEY)) {
 // Modèles Groq disponibles
 export const AVAILABLE_MODELS: GroqModel[] = [
   { id: "llama3-70b-8192", name: "Llama 3 70B" },
-  { id: "qwen-72b", name: "Qwen 72B" },
+  { id: "qwen-qwq-32b", name: "Qwen QWQ 32B" },
   { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B" },
   { id: "llama3-8b-8192", name: "Llama 3 8B" },
   { id: "gemma-7b-it", name: "Gemma 7B" }

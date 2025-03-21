@@ -88,10 +88,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
       // Sélectionner le modèle en fonction du mode
       let modelId = selectedModel.id;
       
-      // En mode reasoning, utiliser Qwen 72B
+      // En mode reasoning, utiliser Qwen QWQ 32B
       if (generationMode === "reasoning") {
-        // Trouver le modèle Qwen 72B
-        const qwenModel = GROQ_MODELS.find(model => model.id === "qwen-72b");
+        // Trouver le modèle Qwen QWQ 32B
+        const qwenModel = GROQ_MODELS.find(model => model.id === "qwen-qwq-32b");
         if (qwenModel) {
           modelId = qwenModel.id;
         }
@@ -522,7 +522,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                 }`}></div>
                 <span>
                   {generationMode === "reasoning" 
-                    ? "Qwen-72B" 
+                    ? "Qwen-32B" 
                     : selectedModel.name.split(' ')[0]}
                 </span>
               </div>
@@ -567,7 +567,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
             }`}></div>
             <span>
               {generationMode === "reasoning" 
-                ? "Qwen-72B" 
+                ? "Qwen-32B" 
                 : selectedModel.name.split(' ')[0]}
             </span>
           </div>
