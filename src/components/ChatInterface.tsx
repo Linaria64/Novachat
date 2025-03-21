@@ -30,6 +30,7 @@ interface ConversationInfo {
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
+  // Commencer par définir tous les états
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<BaseMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -45,9 +46,120 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const [isLoadingComplete, setIsLoadingComplete] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
 
+  // Définir les refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Définir toutes les fonctions callback avec useCallback avant de les utiliser dans les effets
+  const fetchModels = useCallback(async () => {
+    try {
+      setIsLoadingModels(true);
+      // Code pour récupérer les modèles...
+    } catch (error) {
+      console.error("Error fetching models:", error);
+      toast.error("Failed to fetch models");
+    } finally {
+      setIsLoadingModels(false);
+    }
+  }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  }, [input, isConnected, isTyping, isLoadingComplete]);
+
+  const handleSend = useCallback(() => {
+    if (!input.trim() || !isConnected || isTyping || !isLoadingComplete) return;
+    
+    const userMessage: BaseMessage = {
+      role: "user",
+      content: input.trim(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsTyping(true);
+    setError(null);
+
+    try {
+      let systemPrompt = "";
+      
+      // Ajouter un système prompt différent selon le mode
+      if (generationMode === "reasoning") {
+        systemPrompt = "Vous êtes un assistant IA qui expose son raisonnement étape par étape. Pour chaque réponse, commencez par une analyse détaillée du problème, puis développez votre raisonnement de manière claire et structurée avant de donner votre conclusion finale.";
+      } else {
+        systemPrompt = "Vous êtes un assistant IA concis et direct. Répondez de manière claire et efficace.";
+      }
+      
+      // Fonction pour configurer le contrôleur d'abandon
+      const setupAbortController = () => {
+        const abort = () => {
+          console.log("Generation aborted by user");
+          setIsTyping(false);
+          toast.info("Génération arrêtée");
+        };
+        setAbortController(() => abort);
+      };
+      
+      // Configurer le contrôleur d'abandon
+      setupAbortController();
+      
+      // Appeler l'API Groq pour générer une réponse
+      generateGroqCompletion(
+        selectedModel.id,
+        [{ role: "system", content: systemPrompt }, ...messages, userMessage],
+        (chunk: string) => {
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            const lastMessage = newMessages[newMessages.length - 1];
+            
+            if (lastMessage && lastMessage.role === "assistant") {
+              return [
+                ...newMessages.slice(0, -1),
+                { ...lastMessage, content: lastMessage.content + chunk },
+              ];
+            }
+            
+            return [
+              ...newMessages,
+              { role: "assistant" as MessageRole, content: chunk },
+            ];
+          });
+        },
+        () => {
+          setIsTyping(false);
+          setAbortController(null);
+        },
+        () => {
+          setError("Échec de la génération de la réponse");
+          setIsTyping(false);
+          setAbortController(null);
+        }
+      );
+    } catch (error) {
+      console.error("Error in handleSend:", error);
+      setError("Échec de la génération de la réponse");
+      setIsTyping(false);
+      setAbortController(null);
+    }
+  }, [input, messages, selectedModel, isConnected, isTyping, isLoadingComplete, generationMode]);
+
+  const stopGeneration = useCallback(() => {
+    if (abortController) {
+      abortController();
+      setAbortController(null);
+      setIsTyping(false);
+    }
+  }, [abortController]);
+
+  const clearConversation = useCallback(() => {
+    setMessages([]);
+    toast.success("Conversation cleared");
+  }, []);
+
+  // Maintenant définir les effets avec useEffect
   // Détecter si l'appareil est mobile
   useEffect(() => {
     const checkIfMobile = () => {
@@ -64,7 +176,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
 
-  // Définir un message de bienvenue initial
+  // Message de bienvenue
   useEffect(() => {
     if (messages.length === 0) {
       setMessages([
@@ -74,9 +186,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
         }
       ]);
     }
-  }, []);
+  }, [messages.length]);
 
-  // Vérifier si l'application est prête (API connectée)
+  // Vérifier si l'application est prête
   useEffect(() => {
     // Fonction pour vérifier l'état du chargement
     const checkIfReady = () => {
@@ -106,22 +218,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
       window.removeEventListener('novachat:loading-complete', handleLoadingComplete);
     };
   }, []);
-
-  // Define fetchModels function before it's used
-  const fetchModels = useCallback(async () => {
-    setIsLoadingModels(true);
-    try {
-      // Set default model if none selected
-      if (!selectedModel) {
-        setSelectedModel(GROQ_MODELS[0]);
-      }
-    } catch (error) {
-      console.error("Error fetching models:", error);
-      toast.error("Failed to fetch models");
-    } finally {
-      setIsLoadingModels(false);
-    }
-  }, [selectedModel]);
 
   // Vérifier la connexion au chargement
   useEffect(() => {
@@ -173,25 +269,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     return () => clearInterval(interval);
   }, [isConnected, fetchModels]);
 
-  // Save messages to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem("chatopia-messages", JSON.stringify(messages));
-  }, [messages]);
-
-  // Save selected model to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem("chatopia-selected-model", selectedModel.id);
-  }, [selectedModel]);
-
-  // Fetch models on component mount
   useEffect(() => {
     fetchModels();
   }, [fetchModels]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, isTyping]);
+
+  // Save selected model to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem("chatopia-selected-model", selectedModel.id);
+  }, [selectedModel]);
+
+  // Save messages to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem("chatopia-messages", JSON.stringify(messages));
+  }, [messages]);
 
   // Focus input when connection status changes
   useEffect(() => {
@@ -199,95 +296,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
       inputRef.current?.focus();
     }
   }, [isConnected, isTyping]);
-
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || isLoadingModels || !isConnected) return;
-
-    const userMessage: BaseMessage = {
-      role: "user",
-      content: input.trim(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsTyping(true);
-    setError(null);
-
-    try {
-      let systemPrompt = "";
-      
-      // Ajouter un système prompt différent selon le mode
-      if (generationMode === "reasoning") {
-        systemPrompt = "Vous êtes un assistant IA qui expose son raisonnement étape par étape. Pour chaque réponse, commencez par une analyse détaillée du problème, puis développez votre raisonnement de manière claire et structurée avant de donner votre conclusion finale.";
-      } else {
-        systemPrompt = "Vous êtes un assistant IA concis et direct. Répondez de manière claire et efficace.";
-      }
-      
-      await generateGroqCompletion(
-        selectedModel.id,
-        [{ role: "system", content: systemPrompt }, ...messages, userMessage],
-        (chunk: string) => {
-          setMessages((prev) => {
-            const newMessages = [...prev];
-            const lastMessage = newMessages[newMessages.length - 1];
-            if (lastMessage && lastMessage.role === "assistant") {
-              return [
-                ...newMessages.slice(0, -1),
-                { ...lastMessage, content: lastMessage.content + chunk },
-              ];
-            }
-            return [
-              ...newMessages,
-              { role: "assistant" as MessageRole, content: chunk },
-            ];
-          });
-        },
-        () => {
-          setIsTyping(false);
-          setIsLoadingModels(false);
-        },
-        () => {
-          setError("Failed to generate response");
-          setIsTyping(false);
-          setIsLoadingModels(false);
-        }
-      );
-    } catch (error) {
-      console.error("Error in handleSend:", error);
-      setError("Failed to generate response");
-      setIsTyping(false);
-      setIsLoadingModels(false);
-    }
-  }, [input, isLoadingModels, messages, selectedModel, isConnected, generationMode]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    // Submit on Enter (without Shift for new line)
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault(); // Prevent default to avoid new line
-      handleSend();
-    }
-  }, [handleSend]);
-
-  const stopGeneration = useCallback(() => {
-    if (abortController) {
-      abortController();
-      setAbortController(null);
-      setIsTyping(false);
-      toast.info("Response generation stopped");
-    }
-  }, [abortController]);
-
-  const clearConversation = useCallback(() => {
-    if (messages.length === 0) return;
-    
-    setMessages([
-      {
-        role: "assistant",
-        content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
-      }
-    ]);
-    toast.success("Conversation cleared");
-  }, []);
 
   // Generate a title for a conversation based on the first message
   const generateConversationTitle = useCallback((content: string) => {
@@ -400,6 +408,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   useEffect(() => {
     saveCurrentConversation();
   }, [messages, saveCurrentConversation]);
+
+  // Charger le modèle sélectionné depuis le localStorage
+  useEffect(() => {
+    const loadSelectedModel = () => {
+      const savedModelId = localStorage.getItem("chatopia-selected-model");
+      if (savedModelId) {
+        const foundModel = GROQ_MODELS.find(model => model.id === savedModelId);
+        if (foundModel) {
+          setSelectedModel(foundModel);
+        }
+      }
+    };
+    
+    loadSelectedModel();
+  }, []);
 
   return (
     <div className={`flex flex-col h-full overflow-hidden ${className}`}>
