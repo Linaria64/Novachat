@@ -8,6 +8,7 @@ import { checkConnection as checkGroqConnection } from "@/services/groqService";
 import "./App.css";
 
 function App() {
+  // Définition de tous les états au début du composant
   const [showNavbar, setShowNavbar] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
@@ -18,21 +19,41 @@ function App() {
   const [isConnectedToGroq, setIsConnectedToGroq] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
   
-  // Détecter si l'appareil est mobile
-  useEffect(() => {
-    const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    // Vérifier au chargement
-    checkIfMobile();
-    
-    // Ajouter un écouteur de redimensionnement
-    window.addEventListener('resize', checkIfMobile);
-    
-    // Nettoyer l'écouteur
-    return () => window.removeEventListener('resize', checkIfMobile);
-  }, []);
+  // Définir les fonctions et callbacks
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
+
+  const toggleDeveloperMode = () => {
+    setIsDeveloperMode(!isDeveloperMode);
+  };
+
+  const handleNewChat = () => {
+    // Créer une nouvelle conversation
+    const event = new CustomEvent('novachat:new-conversation');
+    window.dispatchEvent(event);
+  };
+
+  const handleSettingsClick = () => {
+    setShowSettingsDialog(true);
+  };
+
+  const handleHelpClick = () => {
+    setShowHelpDialog(true);
+  };
+
+  // Fonctions simulées pour les outils de développeur
+  const handleTerminalClick = () => {
+    alert('Terminal (fonctionnalité à venir)');
+  };
+
+  const handleDatabaseClick = () => {
+    alert('Gestionnaire de base de données (fonctionnalité à venir)');
+  };
+
+  const handleCodeEditorClick = () => {
+    alert('Éditeur de code (fonctionnalité à venir)');
+  };
   
   // Vérifier la connexion à l'API Groq
   const checkConnectionStatus = useCallback(async () => {
@@ -51,6 +72,22 @@ function App() {
     } finally {
       setIsCheckingConnection(false);
     }
+  }, []);
+  
+  // Détecter si l'appareil est mobile
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // Vérifier au chargement
+    checkIfMobile();
+    
+    // Ajouter un écouteur de redimensionnement
+    window.addEventListener('resize', checkIfMobile);
+    
+    // Nettoyer l'écouteur
+    return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
   
   // Vérifier la connexion au chargement et périodiquement
@@ -86,40 +123,18 @@ function App() {
     localStorage.setItem('novachat-dev-mode', isDeveloperMode.toString());
   }, [isDeveloperMode]);
 
-  const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  };
-
-  const toggleDeveloperMode = () => {
-    setIsDeveloperMode(!isDeveloperMode);
-  };
-
-  const handleNewChat = () => {
-    // Créer une nouvelle conversation
-    const event = new CustomEvent('novachat:new-conversation');
-    window.dispatchEvent(event);
-  };
-
-  const handleSettingsClick = () => {
-    setShowSettingsDialog(true);
-  };
-
-  const handleHelpClick = () => {
-    setShowHelpDialog(true);
-  };
-
-  // Fonctions simulées pour les outils de développeur
-  const handleTerminalClick = () => {
-    alert('Terminal (fonctionnalité à venir)');
-  };
-
-  const handleDatabaseClick = () => {
-    alert('Gestionnaire de base de données (fonctionnalité à venir)');
-  };
-
-  const handleCodeEditorClick = () => {
-    alert('Éditeur de code (fonctionnalité à venir)');
-  };
+  // Marquer visuellement que l'application est chargée
+  useEffect(() => {
+    // Ajouter une classe au body pendant le chargement
+    if (isLoading || !isConnectedToGroq) {
+      document.body.classList.add('loading-active');
+    } else {
+      document.body.classList.remove('loading-active');
+      // Émission d'un événement pour indiquer que le chargement est terminé
+      const event = new CustomEvent('novachat:loading-complete');
+      window.dispatchEvent(event);
+    }
+  }, [isLoading, isConnectedToGroq]);
 
   // Si l'écran de chargement est actif
   if (isLoading || !isConnectedToGroq) {
@@ -138,19 +153,6 @@ function App() {
       isCheckingConnection={isCheckingConnection} 
     />;
   }
-
-  // Marquer visuellement que l'application est chargée
-  useEffect(() => {
-    // Ajouter une classe au body pendant le chargement
-    if (isLoading || !isConnectedToGroq) {
-      document.body.classList.add('loading-active');
-    } else {
-      document.body.classList.remove('loading-active');
-      // Émission d'un événement pour indiquer que le chargement est terminé
-      const event = new CustomEvent('novachat:loading-complete');
-      window.dispatchEvent(event);
-    }
-  }, [isLoading, isConnectedToGroq]);
 
   return (
     <div className="min-h-screen bg-background relative">
