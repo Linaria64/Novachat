@@ -16,10 +16,13 @@ function App() {
   const [theme, setTheme] = useState<"light" | "dark">(
     window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
   );
-  const [isDeveloperMode, setIsDeveloperMode] = useState(() => {
-    const savedMode = localStorage.getItem("chatopia-developer-mode");
-    return savedMode ? savedMode === "true" : false;
-  });
+  
+  // Mode développeur caché par défaut
+  const [isDeveloperMode, setIsDeveloperMode] = useState(false);
+  
+  // Secret pour activer le mode développeur (cliquer 5 fois sur le logo)
+  const [devModeClicks, setDevModeClicks] = useState(0);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isConnectedToGroq, setIsConnectedToGroq] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
@@ -51,11 +54,6 @@ function App() {
       window.removeEventListener("resize", checkIsMobile);
     };
   }, []);
-  
-  // Enregistrer le mode développeur
-  useEffect(() => {
-    localStorage.setItem("chatopia-developer-mode", isDeveloperMode.toString());
-  }, [isDeveloperMode]);
   
   // Vérifier la connexion à l'API
   useEffect(() => {
@@ -134,6 +132,22 @@ function App() {
     alert('Éditeur de code (fonctionnalité à venir)');
   }, []);
 
+  // Gestionnaire de clics pour le mode développeur secret
+  const handleLogoClick = useCallback(() => {
+    setDevModeClicks(prev => {
+      const newCount = prev + 1;
+      if (newCount >= 5) {
+        // Activer le mode développeur après 5 clics
+        setIsDeveloperMode(true);
+        return 0; // réinitialiser le compteur
+      }
+      
+      // Réinitialiser le compteur après 3 secondes
+      setTimeout(() => setDevModeClicks(0), 3000);
+      return newCount;
+    });
+  }, []);
+
   return (
     <div className={`min-h-screen bg-background relative ${isMobile ? 'main-container' : 'overflow-hidden'}`}>
       {isLoading ? (
@@ -166,7 +180,7 @@ function App() {
                     className={`p-2 rounded-full transition-all cursor-pointer ${
                       isDeveloperMode ? "bg-gradient-to-br from-amber-500 to-red-600" : "bg-gradient-to-br from-blue-500 to-indigo-600"
                     }`}
-                    onClick={toggleDeveloperMode}
+                    onClick={handleLogoClick}
                   >
                     <Bot size={28} className="text-white" />
                   </div>
@@ -176,27 +190,29 @@ function App() {
 
               {/* Navigation buttons */}
               <div className="flex flex-col items-center gap-4 mt-6 px-3">
-                {/* Mode toggle */}
-                <button 
-                  className={`nav-button w-full ${showNavbar ? 'pl-4 pr-3 justify-between' : 'w-10 mx-auto justify-center'} ${
-                    isDeveloperMode 
-                      ? "text-amber-600 dark:text-amber-400" 
-                      : "text-blue-600 dark:text-blue-400"
-                  }`}
-                  onClick={toggleDeveloperMode}
-                  title={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
-                >
-                  <div className="flex items-center">
-                    {isDeveloperMode ? <Code size={18} /> : <Bot size={18} />}
-                    {showNavbar && <span className="ml-3 text-sm font-medium">Mode {isDeveloperMode ? "Développeur" : "Utilisateur"}</span>}
-                  </div>
-                  {showNavbar && (
-                    <Switch 
-                      checked={isDeveloperMode}
-                      className="data-[state=checked]:bg-amber-500 data-[state=unchecked]:bg-blue-500"
-                    />
-                  )}
-                </button>
+                {/* Mode toggle - Caché sauf si mode développeur activé */}
+                {isDeveloperMode && (
+                  <button 
+                    className={`nav-button w-full ${showNavbar ? 'pl-4 pr-3 justify-between' : 'w-10 mx-auto justify-center'} ${
+                      isDeveloperMode 
+                        ? "text-amber-600 dark:text-amber-400" 
+                        : "text-blue-600 dark:text-blue-400"
+                    }`}
+                    onClick={toggleDeveloperMode}
+                    title={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
+                  >
+                    <div className="flex items-center">
+                      {isDeveloperMode ? <Code size={18} /> : <Bot size={18} />}
+                      {showNavbar && <span className="ml-3 text-sm font-medium">Mode {isDeveloperMode ? "Développeur" : "Utilisateur"}</span>}
+                    </div>
+                    {showNavbar && (
+                      <Switch 
+                        checked={isDeveloperMode}
+                        className="data-[state=checked]:bg-amber-500 data-[state=unchecked]:bg-blue-500"
+                      />
+                    )}
+                  </button>
+                )}
                 
                 {/* Bouton nouvelle conversation */}
                 <button 
@@ -277,22 +293,25 @@ function App() {
           {/* Mobile navbar */}
           {isMobile && (
             <div className="mobile-navbar">
-              <button 
-                className={`mobile-navbar-button ${
-                  isDeveloperMode
-                    ? "bg-gradient-to-br from-amber-500 to-red-600"
-                    : "bg-gradient-to-br from-blue-500 to-indigo-600"
-                }`}
-                onClick={toggleDeveloperMode}
-                title={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
-                aria-label={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
-              >
-                {isDeveloperMode ? (
-                  <Code className="h-5 w-5 text-white" />
-                ) : (
-                  <Bot className="h-5 w-5 text-white" />
-                )}
-              </button>
+              {/* Bouton Mode développeur - uniquement visible si activé */}
+              {isDeveloperMode && (
+                <button 
+                  className={`mobile-navbar-button ${
+                    isDeveloperMode
+                      ? "bg-gradient-to-br from-amber-500 to-red-600"
+                      : "bg-gradient-to-br from-blue-500 to-indigo-600"
+                  }`}
+                  onClick={toggleDeveloperMode}
+                  title={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
+                  aria-label={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
+                >
+                  {isDeveloperMode ? (
+                    <Code className="h-5 w-5 text-white" />
+                  ) : (
+                    <Bot className="h-5 w-5 text-white" />
+                  )}
+                </button>
+              )}
               
               <button 
                 className="mobile-navbar-button bg-gradient-primary text-white"
@@ -303,6 +322,7 @@ function App() {
                 <MessageSquare className="h-5 w-5" />
               </button>
               
+              {/* Boutons de mode développeur - uniquement visibles si activé */}
               {isDeveloperMode && (
                 <>
                   <button 
@@ -357,17 +377,20 @@ function App() {
                 <DialogTitle className="text-xl font-bold">Paramètres</DialogTitle>
               </DialogHeader>
               <div className="py-4 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">Mode développeur</h3>
-                    <p className="text-sm text-muted-foreground">Activer les fonctionnalités avancées</p>
+                {/* Option mode développeur - uniquement visible si activé */}
+                {isDeveloperMode && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium">Mode développeur</h3>
+                      <p className="text-sm text-muted-foreground">Activer les fonctionnalités avancées</p>
+                    </div>
+                    <Switch 
+                      checked={isDeveloperMode} 
+                      onCheckedChange={toggleDeveloperMode} 
+                      className="data-[state=checked]:bg-amber-500"
+                    />
                   </div>
-                  <Switch 
-                    checked={isDeveloperMode} 
-                    onCheckedChange={toggleDeveloperMode} 
-                    className="data-[state=checked]:bg-amber-500"
-                  />
-                </div>
+                )}
                 
                 <div className="flex items-center justify-between">
                   <div>
