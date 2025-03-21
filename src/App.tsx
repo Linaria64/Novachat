@@ -267,7 +267,7 @@ function App() {
           {isMobile && (
             <div className="mobile-navbar">
               <button 
-                className={`mobile-navbar-button transition-all ${
+                className={`mobile-navbar-button ${
                   isDeveloperMode
                     ? "bg-gradient-to-br from-amber-500 to-red-600"
                     : "bg-gradient-to-br from-blue-500 to-indigo-600"
@@ -328,8 +328,8 @@ function App() {
             </div>
           )}
 
-          <main className={`w-full ${isMobile ? 'pb-32 min-h-screen' : 'h-screen'}`}>
-            <ChatInterface className={isMobile ? 'pb-16' : 'ml-8'} />
+          <main className={`w-full ${isMobile ? 'pb-20 min-h-screen' : 'h-screen'}`}>
+            <ChatInterface className={isMobile ? 'mobile-optimized' : 'ml-8'} />
           </main>
           
           {/* Boîtes de dialogue */}

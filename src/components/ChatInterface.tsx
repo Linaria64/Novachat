@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, X, Loader2, Bot, Brain, Trash } from "lucide-react";
+import { Send, X, Loader2, Bot, Brain, Trash, ChevronDown } from "lucide-react";
 import { generateGroqCompletion, checkConnection, AVAILABLE_MODELS } from "@/services/groqService";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Message } from "@/types/chat";
@@ -31,6 +31,8 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isLoadingComplete, setIsLoadingComplete] = useState<boolean>(false);
+  const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -371,10 +373,47 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   const displayModel = selectedMode === "reasoning" 
     ? "Qwen-32B" 
     : "Llama 3.3-70B";
+  
+  // Détection de l'appareil mobile
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Détection pour afficher le bouton de défilement
+  useEffect(() => {
+    if (!chatContainerRef.current) return;
+    
+    const checkScroll = () => {
+      const container = chatContainerRef.current;
+      if (!container) return;
+      
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isScrolled = scrollHeight - scrollTop - clientHeight > 100;
+      setShowScrollButton(isScrolled);
+    };
+    
+    const container = chatContainerRef.current;
+    container.addEventListener('scroll', checkScroll);
+    
+    return () => {
+      container?.removeEventListener('scroll', checkScroll);
+    };
+  }, [messages]);
 
   return (
     <div className={cn("h-screen flex flex-col p-4 mobile-optimized", className)}>
-      <div ref={chatContainerRef} className="flex-1 overflow-y-auto rounded-xl glassmorphism shadow-lg mb-4 p-3 md:p-4 relative">
+      <div 
+        ref={chatContainerRef} 
+        className={cn(
+          "flex-1 overflow-y-auto rounded-xl glassmorphism shadow-lg mb-4 relative",
+          isMobile ? "mobile-chat-container" : "p-3 md:p-4"
+        )}
+      >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-4 md:p-6 text-center">
             <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center mb-4 floating-effect">
@@ -420,7 +459,21 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
             </div>
           </div>
         ) : (
-          <div className="space-y-4 pt-2 pb-16 md:pb-20">
+          <div className={cn(
+            isMobile ? "mobile-messages-container" : "space-y-4 pt-2 pb-16 md:pb-20"
+          )}>
+            {isMobile && (
+              <div className="mobile-status-bar">
+                <div className={`status-indicator status-${connectionStatus}`}>
+                  <span className={`status-dot ${connectionStatus}`}></span>
+                  <span className="text-xs">{statusMessage[connectionStatus]}</span>
+                </div>
+                <div className="model-badge">
+                  <span>{selectedMode === "reasoning" ? "Qwen" : "Llama"}</span>
+                </div>
+              </div>
+            )}
+            
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -432,6 +485,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
                 <div
                   className={cn(
                     "message-container message-highlight position-relative",
+                    isMobile && "mobile-message",
                     message.role === MessageRole.User
                       ? "user-message"
                       : "assistant-message"
@@ -484,7 +538,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
                     )}
                   </div>
                 </div>
-                <div className="text-xs text-muted-foreground mt-1 px-2">
+                <div className={cn("text-xs text-muted-foreground mt-1 px-2", isMobile && "mobile-timestamp")}>
                   {message.timestamp.toLocaleTimeString([], { 
                     hour: '2-digit', 
                     minute: '2-digit' 
@@ -495,65 +549,66 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
             <div ref={messagesEndRef} />
           </div>
         )}
+        
+        {/* Bouton de défilement vers le bas pour mobile */}
+        {isMobile && showScrollButton && (
+          <button 
+            className={cn("scroll-to-bottom", showScrollButton && "visible")}
+            onClick={scrollToBottom}
+            aria-label="Défiler vers le bas"
+          >
+            <ChevronDown className="w-5 h-5" />
+          </button>
+        )}
       </div>
       
-      <div className="relative chat-input-container">
-        <div className="flex items-center gap-2 px-2">
-          <div className={`status-indicator status-${connectionStatus}`}>
-            <span className={`status-dot ${connectionStatus}`}></span>
-            <span className="hidden sm:inline text-xs">{statusMessage[connectionStatus]}</span>
+      {/* Zone d'entrée de texte optimisée pour mobile */}
+      <div className={cn(
+        "relative", 
+        isMobile ? "mobile-input-wrapper" : "chat-input-container"
+      )}>
+        {!isMobile && (
+          <div className="flex items-center gap-2 px-2">
+            <div className={`status-indicator status-${connectionStatus}`}>
+              <span className={`status-dot ${connectionStatus}`}></span>
+              <span className="hidden sm:inline text-xs">{statusMessage[connectionStatus]}</span>
+            </div>
+            <div className="model-badge">
+              <span className="hidden sm:inline">{displayModel}</span>
+              <span className="sm:hidden">{selectedMode === "reasoning" ? "Qwen" : "Llama"}</span>
+            </div>
           </div>
-          <div className="model-badge">
-            <span className="hidden sm:inline">{displayModel}</span>
-            <span className="sm:hidden">{selectedMode === "reasoning" ? "Qwen" : "Llama"}</span>
-          </div>
-        </div>
+        )}
         
-        <Textarea
-          ref={inputRef}
-          value={input}
-          onChange={handleTyping}
-          onKeyDown={handleKeyDown}
-          placeholder={
-            !isLoadingComplete
-              ? "Chargement..."
-              : `Message ${selectedMode === "reasoning" ? "(mode reasoning)" : ""}`
-          }
-          className="chat-input min-h-[60px] resize-none py-3"
-          disabled={!isLoadingComplete || isGenerating}
-          rows={1}
-          data-mode={selectedMode}
-        />
-        
-        <div className="absolute right-2 bottom-3 flex items-center gap-2">
-          {isGenerating ? (
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={abortFunction}
-              className="h-8 w-8 rounded-full"
-            >
-              <X className="h-5 w-5 text-red-500" />
-            </Button>
-          ) : (
-            isTyping && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setInput("")}
-                className="h-8 w-8 rounded-full"
-              >
-                <X className="h-5 w-5 text-gray-400" />
-              </Button>
-            )
-          )}
+        <div className={cn(isMobile && "mobile-input-container")}>
+          <Textarea
+            ref={inputRef}
+            value={input}
+            onChange={handleTyping}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              !isLoadingComplete
+                ? "Chargement..."
+                : `Message ${selectedMode === "reasoning" ? "(mode reasoning)" : ""}`
+            }
+            className={cn(
+              "chat-input min-h-[60px] resize-none py-3",
+              isMobile && "mobile-chat-input"
+            )}
+            disabled={!isLoadingComplete || isGenerating}
+            rows={1}
+            data-mode={selectedMode}
+          />
           
           <Button
             size="icon"
             variant="ghost"
             onClick={handleSend}
             disabled={!input.trim() || !isLoadingComplete || isGenerating}
-            className="h-10 w-10 rounded-full bg-gradient-primary text-white disabled:opacity-50 disabled:pointer-events-none hover:opacity-90"
+            className={cn(
+              "h-10 w-10 rounded-full bg-gradient-primary text-white disabled:opacity-50 disabled:pointer-events-none hover:opacity-90",
+              isMobile && "mobile-send-button"
+            )}
           >
             {isGenerating ? (
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -561,31 +616,78 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
               <Send className="h-5 w-5" />
             )}
           </Button>
+          
+          {(isGenerating || (isTyping && isMobile)) && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={isGenerating ? abortFunction : () => setInput("")}
+              className={cn(
+                "absolute right-12 bottom-3 h-8 w-8 rounded-full", 
+                isMobile && "bottom-[0.35rem] right-[3.25rem]"
+              )}
+            >
+              <X className={cn("h-5 w-5", isGenerating ? "text-red-500" : "text-gray-400")} />
+            </Button>
+          )}
         </div>
       </div>
       
+      {/* Contrôles supplémentaires en bas */}
       {messages.length > 0 && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={clearMessages}
-                className="absolute right-0 -top-12 h-9 w-9 rounded-full"
-              >
-                <Trash className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Vider la conversation</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className={cn(
+          "absolute right-0 -top-12 h-9 w-9 rounded-full",
+          isMobile && "top-2 right-2 z-20"
+        )}>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={clearMessages}
+                  className="h-9 w-9 rounded-full"
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Vider la conversation</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       )}
       
-      {/* Button to switch modes */}
-      {messages.length > 0 && (
+      {/* Boutons de mode pour mobile */}
+      {messages.length > 0 && isMobile && (
+        <div className="absolute top-2 left-2 z-20 flex gap-1">
+          <button
+            onClick={() => handleModeChange("normal")}
+            className={cn(
+              "mobile-mode-button",
+              selectedMode === "normal" && "bg-gradient-primary text-white border-blue-400"
+            )}
+          >
+            <Bot className="w-3 h-3" />
+            <span>Normal</span>
+          </button>
+          
+          <button
+            onClick={() => handleModeChange("reasoning")}
+            className={cn(
+              "mobile-mode-button",
+              selectedMode === "reasoning" && "bg-gradient-secondary text-white border-amber-400"
+            )}
+          >
+            <Brain className="w-3 h-3" />
+            <span>Reasoning</span>
+          </button>
+        </div>
+      )}
+      
+      {/* Boutons de mode pour desktop */}
+      {messages.length > 0 && !isMobile && (
         <div className="absolute left-0 -top-12 flex gap-2">
           <TooltipProvider>
             <Tooltip>
