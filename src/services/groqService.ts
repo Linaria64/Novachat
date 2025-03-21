@@ -35,9 +35,9 @@ if (!localStorage.getItem(SETTINGS_KEY)) {
 
 // Modèles Groq disponibles
 export const AVAILABLE_MODELS: GroqModel[] = [
+  { id: "llama3-70b-8192", name: "Llama 3 70B" },
   { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B" },
   { id: "llama3-8b-8192", name: "Llama 3 8B" },
-  { id: "llama3-70b-8192", name: "Llama 3 70B" },
   { id: "gemma-7b-it", name: "Gemma 7B" }
 ];
 
@@ -58,31 +58,52 @@ export async function checkConnection(): Promise<boolean> {
       return false;
     }
     
-    const response = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "mixtral-8x7b-32768",
-        messages: [{ role: "user", content: "Hello" }],
-        max_tokens: 1
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("Groq API error:", error);
-      toast.error(`Groq API error: ${error.error?.message || response.statusText}`);
+    // Utiliser un timeout pour éviter les attentes trop longues
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    try {
+      const response = await fetch(GROQ_API_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "llama3-70b-8192",
+          messages: [{ role: "user", content: "Hello" }],
+          max_tokens: 1
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+  
+      if (!response.ok) {
+        const error = await response.json();
+        console.error("Groq API error:", error);
+        toast.error(`Groq API error: ${error.error?.message || response.statusText}`);
+        return false;
+      }
+      
+      console.log("Successfully connected to Groq API");
+      return true;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      const fetchError = error as Error;
+      if (fetchError.name === 'AbortError') {
+        console.error("Connection to Groq API timed out");
+        toast.error("Connection to Groq API timed out. Please try again later.");
+      } else {
+        console.error("Fetch error:", fetchError);
+        toast.error(`Connection error: ${fetchError.message || 'Unknown error'}`);
+      }
       return false;
     }
-    
-    console.log("Successfully connected to Groq API");
-    return true;
   } catch (error) {
     console.error("Error checking connection to Groq API:", error);
-    toast.error("Failed to connect to Groq API");
+    const generalError = error as Error;
+    toast.error(`Failed to connect to Groq API: ${generalError.message || 'Unknown error'}`);
     return false;
   }
 }

@@ -123,24 +123,54 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     }
   }, [selectedModel]);
 
-  const checkConnectionStatus = useCallback(async () => {
-    try {
-      const connected = await checkGroqConnection();
-        
-      if (connected !== isConnected) {
+  // Vérifier la connexion au chargement
+  useEffect(() => {
+    const checkGroqConnectionStatus = async () => {
+      try {
+        console.log("Vérification de la connexion à Groq...");
+        const connected = await checkGroqConnection();
         setIsConnected(connected);
-        if (connected && !isConnected) {
+        
+        if (connected) {
           fetchModels();
-          toast.success("Connected to Groq");
-        } else if (!connected && isConnected) {
-          toast.error("Lost connection to Groq");
+          console.log("Connexion à Groq établie avec succès");
+        } else {
+          setError("Impossible de se connecter à l'API Groq. Veuillez vérifier votre connexion internet et vos paramètres.");
+          console.error("Échec de la connexion à Groq");
         }
+      } catch (error) {
+        console.error("Erreur lors de la vérification de la connexion:", error);
+        setIsConnected(false);
+        setError("Erreur de connexion. Veuillez réessayer plus tard.");
       }
-    } catch (error) {
-      console.error("Error checking connection:", error);
-      setIsConnected(false);
-      toast.error("Failed to check connection");
-    }
+    };
+
+    checkGroqConnectionStatus();
+  }, [fetchModels]);
+
+  // Setup interval to check connection status
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const connected = await checkGroqConnection();
+        
+        if (connected !== isConnected) {
+          setIsConnected(connected);
+          if (connected && !isConnected) {
+            fetchModels();
+            toast.success("Connexion à Groq établie");
+            setError(null);
+          } else if (!connected && isConnected) {
+            toast.error("Connexion à Groq perdue");
+            setError("Connexion à Groq perdue. Tentative de reconnexion...");
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors de la vérification de la connexion:", error);
+      }
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, [isConnected, fetchModels]);
 
   // Save messages to localStorage when they change
@@ -156,11 +186,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   // Fetch models on component mount
   useEffect(() => {
     fetchModels();
-    
-    // Setup interval to check connection status
-    const interval = setInterval(checkConnectionStatus, 30000);
-    return () => clearInterval(interval);
-  }, [fetchModels, checkConnectionStatus]);
+  }, [fetchModels]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
