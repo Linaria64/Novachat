@@ -206,6 +206,97 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
     setSelectedMode(mode);
   }, []);
   
+  // Fonction pour traiter le contenu en mode reasoning
+  const processReasoningContent = (content: string): React.ReactNode => {
+    // Chercher des marqueurs de séparation du contenu
+    const thinkingMatch = content.match(/(?:Thinking:|Reasoning:|Let's think|Let me think|Let's analyze|I need to analyze|Step by step|First,)/i);
+    const answerMatch = content.match(/(?:Answer:|Final answer:|In conclusion:|Therefore,|To summarize:|The answer is:|So,\s+the|Thus,\s+the)/i);
+    
+    if (!thinkingMatch && !answerMatch) {
+      // Pas de séparation claire, renvoyer le contenu normal
+      return (
+        <Markdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            pre({ node, className, children, ...props }) {
+              return (
+                <pre className="bg-gray-800 text-gray-100 rounded-md p-4 overflow-x-auto my-2 text-sm" {...props}>
+                  {children}
+                </pre>
+              );
+            },
+            code({ node, className, children, ...props }) {
+              return <code className="bg-gray-200 dark:bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>;
+            }
+          }}
+        >
+          {content}
+        </Markdown>
+      );
+    }
+    
+    let thinkingContent = content;
+    let answerContent = "";
+    
+    // Si on trouve un marqueur de réponse, séparer le contenu
+    if (answerMatch && answerMatch.index !== undefined) {
+      thinkingContent = content.substring(0, answerMatch.index);
+      answerContent = content.substring(answerMatch.index);
+    }
+    
+    return (
+      <>
+        <div className="thinking-section">
+          <div className="thinking-label">
+            <Brain className="w-3 h-3" /> Raisonnement
+          </div>
+          <Markdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              pre({ node, className, children, ...props }) {
+                return (
+                  <pre className="bg-gray-800 text-gray-100 rounded-md p-4 overflow-x-auto my-2 text-sm" {...props}>
+                    {children}
+                  </pre>
+                );
+              },
+              code({ node, className, children, ...props }) {
+                return <code className="bg-gray-200 dark:bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>;
+              }
+            }}
+          >
+            {thinkingContent}
+          </Markdown>
+        </div>
+        
+        {answerContent && (
+          <div className="final-answer">
+            <div className="answer-label">
+              <Bot className="w-3 h-3" /> Réponse finale
+            </div>
+            <Markdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                pre({ node, className, children, ...props }) {
+                  return (
+                    <pre className="bg-gray-800 text-gray-100 rounded-md p-4 overflow-x-auto my-2 text-sm" {...props}>
+                      {children}
+                    </pre>
+                  );
+                },
+                code({ node, className, children, ...props }) {
+                  return <code className="bg-gray-200 dark:bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>;
+                }
+              }}
+            >
+              {answerContent}
+            </Markdown>
+          </div>
+        )}
+      </>
+    );
+  };
+  
   // Vérification de l'état de chargement
   useEffect(() => {
     // Vérifier si le corps a la classe 'loading-active'
@@ -340,31 +431,50 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
               >
                 <div
                   className={cn(
-                    "message-container position-relative",
+                    "message-container message-highlight position-relative",
                     message.role === MessageRole.User
                       ? "user-message"
                       : "assistant-message"
                   )}
                 >
+                  {/* Badges pour identifier l'émetteur */}
+                  <div className={cn(
+                    "message-sender-badge",
+                    message.role === MessageRole.User ? "user-badge" : "assistant-badge"
+                  )}>
+                    {message.role === MessageRole.User ? "Vous" : "Assistant"}
+                  </div>
+                  
                   <div className="whitespace-pre-wrap">
                     {message.content ? (
-                      <Markdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          pre({ node, className, children, ...props }) {
-                            return (
-                              <pre className="bg-gray-800 text-gray-100 rounded-md p-4 overflow-x-auto my-2 text-sm" {...props}>
-                                {children}
-                              </pre>
-                            );
-                          },
-                          code({ node, className, children, ...props }) {
-                            return <code className="bg-gray-200 dark:bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>;
-                          }
-                        }}
-                      >
-                        {message.content}
-                      </Markdown>
+                      message.role === MessageRole.Assistant && selectedMode === "reasoning" ? (
+                        // Traitement spécial pour le mode reasoning avec séparation thinking/answer
+                        <>
+                          <div className="reasoning-badge">
+                            <Brain className="w-3 h-3" /> Mode Reasoning
+                          </div>
+                          {processReasoningContent(message.content)}
+                        </>
+                      ) : (
+                        // Rendu normal pour les autres messages
+                        <Markdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            pre({ node, className, children, ...props }) {
+                              return (
+                                <pre className="bg-gray-800 text-gray-100 rounded-md p-4 overflow-x-auto my-2 text-sm" {...props}>
+                                  {children}
+                                </pre>
+                              );
+                            },
+                            code({ node, className, children, ...props }) {
+                              return <code className="bg-gray-200 dark:bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>;
+                            }
+                          }}
+                        >
+                          {message.content}
+                        </Markdown>
+                      )
                     ) : (
                       <div className="typing-indicator">
                         <div className="typing-dot"></div>
