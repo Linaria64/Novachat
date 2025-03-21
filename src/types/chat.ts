@@ -34,8 +34,10 @@ export interface GroqModel {
 }
 
 export interface Message {
+  id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  timestamp: Date;
 }
 
 export interface ChatResponse {

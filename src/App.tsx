@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bot, MessageSquare, Settings, Moon, Sun, HelpCircle, Terminal, Database, FileCode, Code, Plus } from "lucide-react";
+import { Bot, MessageSquare, Settings, Moon, Sun, HelpCircle, Terminal, Database, FileCode, Code, Brain } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import ChatInterface from "./components/ChatInterface";
@@ -8,440 +8,441 @@ import { checkConnection as checkGroqConnection } from "@/services/groqService";
 import "./App.css";
 
 function App() {
-  // Définition de tous les états au début du composant
+  // États
   const [showNavbar, setShowNavbar] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [isDeveloperMode, setIsDeveloperMode] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">(
+    window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+  );
+  const [isDeveloperMode, setIsDeveloperMode] = useState(() => {
+    const savedMode = localStorage.getItem("chatopia-developer-mode");
+    return savedMode ? savedMode === "true" : false;
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isConnectedToGroq, setIsConnectedToGroq] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
   
-  // Définir les fonctions et callbacks
-  const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  };
-
-  const toggleDeveloperMode = () => {
-    setIsDeveloperMode(!isDeveloperMode);
-  };
-
-  const handleNewChat = () => {
-    // Créer une nouvelle conversation
-    const event = new CustomEvent('novachat:new-conversation');
-    window.dispatchEvent(event);
-  };
-
-  const handleSettingsClick = () => {
-    setShowSettingsDialog(true);
-  };
-
-  const handleHelpClick = () => {
-    setShowHelpDialog(true);
-  };
-
-  // Fonctions simulées pour les outils de développeur
-  const handleTerminalClick = () => {
-    alert('Terminal (fonctionnalité à venir)');
-  };
-
-  const handleDatabaseClick = () => {
-    alert('Gestionnaire de base de données (fonctionnalité à venir)');
-  };
-
-  const handleCodeEditorClick = () => {
-    alert('Éditeur de code (fonctionnalité à venir)');
-  };
+  // Gestion du thème
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    localStorage.setItem("chatopia-theme", theme);
+  }, [theme]);
   
-  // Vérifier la connexion à l'API Groq
-  const checkConnectionStatus = useCallback(async () => {
-    try {
-      setIsCheckingConnection(true);
-      const connected = await checkGroqConnection();
-      setIsConnectedToGroq(connected);
-      
-      // Si connecté, désactiver l'écran de chargement
-      if (connected) {
-        setIsLoading(false);
-      }
-    } catch (error) {
-      console.error("Error checking connection:", error);
-      setIsConnectedToGroq(false);
-    } finally {
-      setIsCheckingConnection(false);
+  // Chargement du thème depuis localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("chatopia-theme");
+    if (savedTheme) {
+      setTheme(savedTheme as "light" | "dark");
     }
   }, []);
   
-  // Détecter si l'appareil est mobile
+  // Détecter les appareils mobiles
   useEffect(() => {
-    const checkIfMobile = () => {
+    const checkIsMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
     
-    // Vérifier au chargement
-    checkIfMobile();
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
     
-    // Ajouter un écouteur de redimensionnement
-    window.addEventListener('resize', checkIfMobile);
-    
-    // Nettoyer l'écouteur
-    return () => window.removeEventListener('resize', checkIfMobile);
+    return () => {
+      window.removeEventListener("resize", checkIsMobile);
+    };
   }, []);
   
-  // Vérifier la connexion au chargement et périodiquement
+  // Enregistrer le mode développeur
   useEffect(() => {
-    // Vérifier la connexion immédiatement
-    checkConnectionStatus();
-    
-    // Configurer une vérification périodique
-    const interval = setInterval(checkConnectionStatus, 30000);
-    
-    return () => clearInterval(interval);
-  }, [checkConnectionStatus]);
-  
-  // Gérer le thème
-  useEffect(() => {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [theme]);
-
-  // Charger le mode développeur depuis le localStorage
-  useEffect(() => {
-    const savedDevMode = localStorage.getItem('novachat-dev-mode');
-    if (savedDevMode) {
-      setIsDeveloperMode(savedDevMode === 'true');
-    }
-  }, []);
-
-  // Sauvegarder le mode développeur dans le localStorage
-  useEffect(() => {
-    localStorage.setItem('novachat-dev-mode', isDeveloperMode.toString());
+    localStorage.setItem("chatopia-developer-mode", isDeveloperMode.toString());
   }, [isDeveloperMode]);
-
-  // Marquer visuellement que l'application est chargée
+  
+  // Vérifier la connexion à l'API
   useEffect(() => {
-    // Ajouter une classe au body pendant le chargement
-    if (isLoading || !isConnectedToGroq) {
-      document.body.classList.add('loading-active');
-    } else {
-      document.body.classList.remove('loading-active');
-      // Émission d'un événement pour indiquer que le chargement est terminé
-      const event = new CustomEvent('novachat:loading-complete');
-      window.dispatchEvent(event);
-    }
-  }, [isLoading, isConnectedToGroq]);
+    const checkApiConnection = async () => {
+      setIsCheckingConnection(true);
+      try {
+        const isConnected = await checkGroqConnection();
+        setIsConnectedToGroq(isConnected);
+      } catch (error) {
+        console.error("Error checking API connection:", error);
+        setIsConnectedToGroq(false);
+      } finally {
+        setIsCheckingConnection(false);
+      }
+    };
+    
+    checkApiConnection();
+    
+    // Ajouter un écouteur d'événements pour le chargement
+    const handleLoadingComplete = () => {
+      setIsLoading(false);
+      // Supprimer la classe de chargement
+      document.body.classList.remove("loading-active");
+    };
+    
+    const timeout = setTimeout(() => {
+      if (isConnectedToGroq) {
+        handleLoadingComplete();
+        
+        // Émettre un événement pour indiquer la fin du chargement
+        const event = new CustomEvent("novachat:loading-complete");
+        window.dispatchEvent(event);
+      }
+    }, 1000);
+    
+    // Ajouter une classe pour indiquer le chargement
+    document.body.classList.add("loading-active");
+    
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [isConnectedToGroq]);
+  
+  // Handlers
+  const toggleTheme = useCallback(() => {
+    setTheme(prevTheme => prevTheme === "dark" ? "light" : "dark");
+  }, []);
 
-  // Si l'écran de chargement est actif
-  if (isLoading || !isConnectedToGroq) {
-    return <LoadingScreen 
-      onLoadingComplete={() => {
-        if (isConnectedToGroq) {
-          setIsLoading(false);
-          // Émettre un événement pour indiquer que le chargement est terminé
-          const event = new CustomEvent('novachat:loading-complete');
-          window.dispatchEvent(event);
-          // Ajouter une classe au body pour permettre une détection facile de l'état
-          document.body.classList.remove('loading-active');
-        }
-      }} 
-      isConnectedToGroq={isConnectedToGroq} 
-      isCheckingConnection={isCheckingConnection} 
-    />;
-  }
+  const toggleDeveloperMode = useCallback(() => {
+    setIsDeveloperMode(prev => !prev);
+  }, []);
+
+  const handleNewChat = useCallback(() => {
+    const event = new CustomEvent('novachat:new-conversation');
+    window.dispatchEvent(event);
+  }, []);
+
+  const handleSettingsClick = useCallback(() => {
+    setShowSettingsDialog(true);
+  }, []);
+
+  const handleHelpClick = useCallback(() => {
+    setShowHelpDialog(true);
+  }, []);
+
+  // Fonctions pour les outils développeur
+  const handleTerminalClick = useCallback(() => {
+    alert('Terminal (fonctionnalité à venir)');
+  }, []);
+
+  const handleDatabaseClick = useCallback(() => {
+    alert('Base de données (fonctionnalité à venir)');
+  }, []);
+
+  const handleCodeEditorClick = useCallback(() => {
+    alert('Éditeur de code (fonctionnalité à venir)');
+  }, []);
 
   return (
-    <div className="min-h-screen bg-background relative">
-      {/* Desktop Navbar - visible uniquement sur desktop */}
-      {!isMobile && (
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {isLoading ? (
+        <LoadingScreen 
+          onLoadingComplete={() => setIsLoading(false)}
+          isConnectedToGroq={isConnectedToGroq}
+          isCheckingConnection={isCheckingConnection}
+        />
+      ) : (
         <>
-          {/* Navbar latérale semi-visible avec effet de glassmorphism */}
-          <div 
-            className={`fixed left-0 top-0 h-full w-24 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-r border-white/20 dark:border-gray-800/30 z-30 transition-all duration-300 ease-in-out shadow-md ${
-              showNavbar ? 'translate-x-0 w-64' : 'translate-x-[-50%]'
-            }`}
-            onMouseEnter={() => setShowNavbar(true)}
-            onMouseLeave={() => setShowNavbar(false)}
-          >
-            {/* Logo en haut de la barre latérale */}
-            <div className="w-full flex justify-center items-center py-4 mb-6">
-              <div className={`flex items-center justify-center transition-all duration-300 ${showNavbar ? 'ml-0' : 'ml-12'}`}>
-                <Bot size={32} className="text-primary" />
-                {showNavbar && <span className="ml-2 font-bold text-lg">NovaChat</span>}
-              </div>
-            </div>
-
-            {/* Conteneur des boutons avec espacement uniforme */}
-            <div className="flex flex-col items-center gap-6 mt-8">
-              {/* Bouton de nouvelle conversation (présent dans les deux modes) */}
-              <button 
-                className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-blue-100/80 to-blue-200/50 dark:from-blue-900/30 dark:to-blue-800/20 flex items-center justify-start text-blue-600 dark:text-blue-400 hover:bg-blue-200/70 dark:hover:bg-blue-800/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
-                onClick={handleNewChat}
-                title="Nouvelle conversation"
-                aria-label="Nouvelle conversation"
-              >
-                <MessageSquare size={20} className="flex-shrink-0" />
-                {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Nouvelle conversation</span>}
-              </button>
-              
-              {/* Boutons spécifiques au mode développeur */}
-              {isDeveloperMode && (
-                <>
-                  <button 
-                    className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-amber-100/80 to-amber-200/50 dark:from-amber-900/30 dark:to-amber-800/20 flex items-center justify-start text-amber-600 dark:text-amber-400 hover:bg-amber-200/70 dark:hover:bg-amber-800/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
-                    onClick={handleTerminalClick}
-                    title="Terminal"
-                    aria-label="Terminal"
-                  >
-                    <Terminal size={20} className="flex-shrink-0" />
-                    {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Terminal</span>}
-                  </button>
-                  
-                  <button 
-                    className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-green-100/80 to-green-200/50 dark:from-green-900/30 dark:to-green-800/20 flex items-center justify-start text-green-600 dark:text-green-400 hover:bg-green-200/70 dark:hover:bg-green-800/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
-                    onClick={handleDatabaseClick}
-                    title="Base de données"
-                    aria-label="Base de données"
-                  >
-                    <Database size={20} className="flex-shrink-0" />
-                    {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Base de données</span>}
-                  </button>
-                  
-                  <button 
-                    className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-purple-100/80 to-purple-200/50 dark:from-purple-900/30 dark:to-purple-800/20 flex items-center justify-start text-purple-600 dark:text-purple-400 hover:bg-purple-200/70 dark:hover:bg-purple-800/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
-                    onClick={handleCodeEditorClick}
-                    title="Éditeur de code"
-                    aria-label="Éditeur de code"
-                  >
-                    <FileCode size={20} className="flex-shrink-0" />
-                    {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Éditeur de code</span>}
-                  </button>
-                </>
-              )}
-              
-              {/* Boutons toujours présents */}
-              <button 
-                className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-gray-100/80 to-gray-200/50 dark:from-gray-800/30 dark:to-gray-700/20 flex items-center justify-start text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
-                onClick={handleSettingsClick}
-                title="Paramètres"
-                aria-label="Paramètres"
-              >
-                <Settings size={20} className="flex-shrink-0" />
-                {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Paramètres</span>}
-              </button>
-              
-              <button 
-                className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-blue-100/80 to-blue-200/50 dark:from-blue-900/30 dark:to-blue-800/20 flex items-center justify-start text-blue-600 dark:text-blue-400 hover:bg-blue-200/70 dark:hover:bg-blue-800/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
-                onClick={handleHelpClick}
-                title="Aide"
-                aria-label="Aide"
-              >
-                <HelpCircle size={20} className="flex-shrink-0" />
-                {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Aide</span>}
-              </button>
-              
-              <button 
-                className={`h-12 rounded-l-full rounded-r-full ${showNavbar ? 'w-48 pl-4 pr-6' : 'w-12 rounded-r-full'} bg-gradient-to-r from-gray-100/80 to-gray-200/50 dark:from-gray-800/30 dark:to-gray-700/20 flex items-center justify-start text-gray-600 dark:text-gray-400 hover:bg-gray-200/70 dark:hover:bg-gray-700/50 transition-all shadow-md ${showNavbar ? 'ml-8' : 'ml-12'}`}
-                onClick={toggleTheme}
-                title={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
-                aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
-              >
-                {theme === 'dark' ? (
-                  <>
-                    <Sun size={20} className="flex-shrink-0" />
-                    {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Mode clair</span>}
-                  </>
-                ) : (
-                  <>
-                    <Moon size={20} className="flex-shrink-0" />
-                    {showNavbar && <span className="ml-3 whitespace-nowrap overflow-hidden">Mode sombre</span>}
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      <main className={`w-full ${isMobile ? 'pb-20' : 'h-screen'}`}>
-        <ChatInterface />
-      </main>
-      
-      {/* Barre de navigation mobile en bas */}
-      {isMobile && (
-        <div className="mobile-navbar mobile-navbar-enter">
-          {/* Icon pour toggle le mode (utilisateur/développeur) */}
-          <button
-            className={`mobile-navbar-button transition-all ${
-              isDeveloperMode 
-                ? "bg-gradient-to-br from-amber-500 to-red-600" 
-                : "bg-gradient-to-br from-blue-500 to-purple-600"
-            }`}
-            onClick={toggleDeveloperMode}
-            aria-label={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
-          >
-            {isDeveloperMode ? (
-              <Code className="w-5 h-5 text-white" />
-            ) : (
-              <Bot className="w-5 h-5 text-white" />
-            )}
-          </button>
-          
-          {/* Nouvelle conversation */}
-          <button
-            className="mobile-navbar-button bg-blue-100/80 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"
-            onClick={handleNewChat}
-            aria-label="Nouvelle conversation"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
-          
-          {/* Boutons conditionnels pour le mode développeur */}
-          {isDeveloperMode && (
-            <>
-              <button
-                className="mobile-navbar-button bg-amber-100/80 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400"
-                onClick={handleTerminalClick}
-                aria-label="Terminal"
-              >
-                <Terminal className="w-5 h-5" />
-              </button>
-              
-              <button
-                className="mobile-navbar-button bg-green-100/80 dark:bg-green-900/40 text-green-600 dark:text-green-400"
-                onClick={handleDatabaseClick}
-                aria-label="Base de données"
-              >
-                <Database className="w-5 h-5" />
-              </button>
-              
-              <button
-                className="mobile-navbar-button bg-purple-100/80 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400"
-                onClick={handleCodeEditorClick}
-                aria-label="Éditeur de code"
-              >
-                <FileCode className="w-5 h-5" />
-              </button>
-            </>
-          )}
-          
-          {/* Paramètres */}
-          <button
-            className="mobile-navbar-button bg-gray-100/80 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400"
-            onClick={handleSettingsClick}
-            aria-label="Paramètres"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-          
-          {/* Aide */}
-          <button
-            className="mobile-navbar-button bg-gray-100/80 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400"
-            onClick={handleHelpClick}
-            aria-label="Aide"
-          >
-            <HelpCircle className="w-5 h-5" />
-          </button>
-          
-          {/* Thème */}
-          <button
-            className="mobile-navbar-button bg-amber-100/80 dark:bg-indigo-900/40 text-amber-600 dark:text-indigo-400"
-            onClick={toggleTheme}
-            aria-label={theme === "dark" ? "Mode clair" : "Mode sombre"}
-          >
-            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-        </div>
-      )}
-      
-      {/* Étiquette de version en bas à droite */}
-      <div className={`fixed ${isMobile ? 'bottom-20' : 'bottom-2'} right-2 text-xs text-muted-foreground/60 pointer-events-none select-none z-10`}>
-        NovaChat v alpha 0.01
-      </div>
-      
-      {/* Dialogs */}
-      <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
-        <DialogContent className="w-[90vw] max-w-md mx-auto">
-          <DialogHeader>
-            <DialogTitle>Paramètres</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-6">
-            <p className="text-muted-foreground text-sm">
-              Configurez ici les paramètres de votre application NovaChat.
-            </p>
-            
-            <div className="space-y-4">
-              {/* Mode thème */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-medium">Mode sombre</span>
-                  <p className="text-muted-foreground text-xs mt-1">Basculer entre le mode clair et sombre</p>
+          {/* Navbar pour Desktop */}
+          {!isMobile && (
+            <div 
+              className={`fixed left-0 top-0 h-full glassmorphism z-30 transition-all duration-300 ease-out shadow-lg ${
+                showNavbar ? 'w-64 translate-x-0' : 'w-24 translate-x-[-70%]'
+              }`}
+              onMouseEnter={() => setShowNavbar(true)}
+              onMouseLeave={() => setShowNavbar(false)}
+            >
+              {/* Logo et titre */}
+              <div className="w-full flex justify-center items-center py-6 mb-8">
+                <div className={`flex items-center justify-center transition-all duration-300 ${showNavbar ? 'ml-0' : 'ml-14'}`}>
+                  <div className={`p-2 rounded-full transition-all ${isDeveloperMode ? "bg-gradient-to-br from-amber-500 to-red-600" : "bg-gradient-to-br from-blue-500 to-indigo-600"}`}>
+                    <Bot size={28} className="text-white" />
+                  </div>
+                  {showNavbar && <span className="ml-3 font-bold text-lg opacity-0 animate-fadeIn" style={{ animationDelay: '0.1s', animationFillMode: 'forwards' }}>NovaChat</span>}
                 </div>
+              </div>
+
+              {/* Navigation buttons */}
+              <div className="flex flex-col items-center gap-4 mt-6 px-3">
+                {/* Mode toggle */}
                 <button 
-                  className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary"
-                  onClick={toggleTheme}
+                  className={`nav-button w-full ${showNavbar ? 'pl-4 pr-3 justify-between' : 'w-10 mx-auto justify-center'} ${
+                    isDeveloperMode 
+                      ? "text-amber-600 dark:text-amber-400" 
+                      : "text-blue-600 dark:text-blue-400"
+                  }`}
+                  onClick={toggleDeveloperMode}
+                  title={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
                 >
-                  {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+                  <div className="flex items-center">
+                    {isDeveloperMode ? <Code size={18} /> : <Bot size={18} />}
+                    {showNavbar && <span className="ml-3 text-sm font-medium">Mode {isDeveloperMode ? "Développeur" : "Utilisateur"}</span>}
+                  </div>
+                  {showNavbar && (
+                    <Switch 
+                      checked={isDeveloperMode}
+                      className="data-[state=checked]:bg-amber-500 data-[state=unchecked]:bg-blue-500"
+                    />
+                  )}
+                </button>
+                
+                {/* Bouton nouvelle conversation */}
+                <button 
+                  className={`nav-button ${showNavbar ? 'w-full pl-4' : 'w-10 mx-auto'} bg-gradient-primary text-white`}
+                  onClick={handleNewChat}
+                  title="Nouvelle conversation"
+                >
+                  <MessageSquare size={18} />
+                  {showNavbar && <span className="ml-3 text-sm font-medium">Nouvelle conversation</span>}
+                </button>
+                
+                {/* Boutons spécifiques au mode développeur */}
+                {isDeveloperMode && (
+                  <div className={`flex flex-col gap-4 w-full ${showNavbar ? '' : 'items-center'}`}>
+                    <button 
+                      className={`nav-button ${showNavbar ? 'w-full pl-4' : 'w-10 mx-auto'} bg-gradient-secondary text-white`}
+                      onClick={handleTerminalClick}
+                      title="Terminal"
+                    >
+                      <Terminal size={18} />
+                      {showNavbar && <span className="ml-3 text-sm font-medium">Terminal</span>}
+                    </button>
+                    
+                    <button 
+                      className={`nav-button ${showNavbar ? 'w-full pl-4' : 'w-10 mx-auto'} bg-gradient-secondary text-white`}
+                      onClick={handleDatabaseClick}
+                      title="Base de données"
+                    >
+                      <Database size={18} />
+                      {showNavbar && <span className="ml-3 text-sm font-medium">Base de données</span>}
+                    </button>
+                    
+                    <button 
+                      className={`nav-button ${showNavbar ? 'w-full pl-4' : 'w-10 mx-auto'} bg-gradient-secondary text-white`}
+                      onClick={handleCodeEditorClick}
+                      title="Éditeur de code"
+                    >
+                      <FileCode size={18} />
+                      {showNavbar && <span className="ml-3 text-sm font-medium">Éditeur de code</span>}
+                    </button>
+                  </div>
+                )}
+                
+                {/* Séparateur */}
+                <div className={`my-2 ${showNavbar ? 'w-full' : 'w-10'} h-px bg-gray-200 dark:bg-gray-700 opacity-50`}></div>
+                
+                {/* Boutons toujours présents */}
+                <button 
+                  className={`nav-button ${showNavbar ? 'w-full pl-4' : 'w-10 mx-auto'} text-gray-600 dark:text-gray-300`}
+                  onClick={handleSettingsClick}
+                  title="Paramètres"
+                >
+                  <Settings size={18} />
+                  {showNavbar && <span className="ml-3 text-sm font-medium">Paramètres</span>}
+                </button>
+                
+                <button 
+                  className={`nav-button ${showNavbar ? 'w-full pl-4' : 'w-10 mx-auto'} text-gray-600 dark:text-gray-300`}
+                  onClick={handleHelpClick}
+                  title="Aide"
+                >
+                  <HelpCircle size={18} />
+                  {showNavbar && <span className="ml-3 text-sm font-medium">Aide</span>}
+                </button>
+                
+                <button 
+                  className={`nav-button ${showNavbar ? 'w-full pl-4' : 'w-10 mx-auto'} text-gray-600 dark:text-gray-300 mt-auto mb-6`}
+                  onClick={toggleTheme}
+                  title={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
+                >
+                  {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                  {showNavbar && <span className="ml-3 text-sm font-medium">Mode {theme === 'dark' ? 'clair' : 'sombre'}</span>}
                 </button>
               </div>
-              
-              {/* Mode développeur */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-medium">Mode développeur</span>
-                  <p className="text-muted-foreground text-xs mt-1">
-                    Activer les fonctionnalités avancées pour les développeurs
-                  </p>
-                </div>
-                <Switch 
-                  checked={isDeveloperMode} 
-                  onCheckedChange={toggleDeveloperMode} 
-                  aria-label="Mode développeur"
-                />
-              </div>
-              
-              {/* Autres options de paramètres */}
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={showHelpDialog} onOpenChange={setShowHelpDialog}>
-        <DialogContent className="w-[90vw] max-w-md mx-auto">
-          <DialogHeader>
-            <DialogTitle>Aide</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-muted-foreground text-sm mb-4">
-              Bienvenue sur NovaChat ! Voici quelques conseils pour utiliser l'application :
-            </p>
-            <ul className="space-y-2 list-disc pl-5">
-              <li>Entrez votre message dans la zone de texte en bas de l'écran</li>
-              <li>Appuyez sur Entrée ou cliquez sur l'icône d'envoi pour envoyer votre message</li>
-              <li>Pour effacer la conversation, utilisez l'icône de corbeille</li>
-              <li>Pour changer entre le mode clair et sombre, utilisez l'icône de lune/soleil</li>
+          )}
+          
+          {/* Mobile navbar */}
+          {isMobile && (
+            <div className="mobile-navbar">
+              <button 
+                className={`mobile-navbar-button transition-all ${
+                  isDeveloperMode
+                    ? "bg-gradient-to-br from-amber-500 to-red-600"
+                    : "bg-gradient-to-br from-blue-500 to-indigo-600"
+                }`}
+                onClick={toggleDeveloperMode}
+                title={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
+              >
+                {isDeveloperMode ? (
+                  <Code className="h-5 w-5 text-white" />
+                ) : (
+                  <Bot className="h-5 w-5 text-white" />
+                )}
+              </button>
+              
+              <button 
+                className="mobile-navbar-button bg-gradient-primary text-white"
+                onClick={handleNewChat}
+                title="Nouvelle conversation"
+              >
+                <MessageSquare className="h-5 w-5" />
+              </button>
+              
               {isDeveloperMode && (
                 <>
-                  <li className="mt-4 text-amber-600 dark:text-amber-400 font-medium">Fonctionnalités du mode développeur :</li>
-                  <li>Terminal : Accès à un terminal intégré pour exécuter des commandes</li>
-                  <li>Base de données : Visualiser et gérer les données de l'application</li>
-                  <li>Éditeur de code : Modifier le code source de l'application</li>
+                  <button 
+                    className="mobile-navbar-button bg-gradient-secondary text-white"
+                    onClick={handleTerminalClick}
+                    title="Terminal"
+                  >
+                    <Terminal className="h-5 w-5" />
+                  </button>
+                  
+                  <button 
+                    className="mobile-navbar-button bg-gradient-secondary text-white"
+                    onClick={handleDatabaseClick}
+                    title="Base de données"
+                  >
+                    <Database className="h-5 w-5" />
+                  </button>
                 </>
               )}
-            </ul>
-            
-            {!isDeveloperMode && (
-              <div className="mt-6 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-sm">
-                <p>Conseil : <span className="text-blue-600 dark:text-blue-400">Activez le mode développeur</span> dans les paramètres pour accéder à des fonctionnalités avancées.</p>
+              
+              <button 
+                className="mobile-navbar-button bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
+                onClick={handleSettingsClick}
+                title="Paramètres"
+              >
+                <Settings className="h-5 w-5" />
+              </button>
+              
+              <button 
+                className="mobile-navbar-button bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
+                onClick={toggleTheme}
+                title={theme === "dark" ? "Mode clair" : "Mode sombre"}
+              >
+                {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              </button>
+            </div>
+          )}
+
+          <main className={`w-full ${isMobile ? 'pb-20' : 'h-screen'}`}>
+            <ChatInterface className={isMobile ? '' : 'ml-8'} />
+          </main>
+          
+          {/* Boîtes de dialogue */}
+          {/* Dialogue des paramètres */}
+          <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
+            <DialogContent className="sm:max-w-md glassmorphism">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold">Paramètres</DialogTitle>
+              </DialogHeader>
+              <div className="py-4 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">Mode développeur</h3>
+                    <p className="text-sm text-muted-foreground">Activer les fonctionnalités avancées</p>
+                  </div>
+                  <Switch 
+                    checked={isDeveloperMode} 
+                    onCheckedChange={toggleDeveloperMode} 
+                    className="data-[state=checked]:bg-amber-500"
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">Thème sombre</h3>
+                    <p className="text-sm text-muted-foreground">Changer l'apparence de l'application</p>
+                  </div>
+                  <Switch 
+                    checked={theme === "dark"} 
+                    onCheckedChange={() => toggleTheme()} 
+                    className="data-[state=checked]:bg-indigo-600"
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">État de connexion</h3>
+                    <p className="text-sm text-muted-foreground">Statut de l'API Groq</p>
+                  </div>
+                  <div className="flex items-center">
+                    <div className={`w-3 h-3 rounded-full mr-2 ${isConnectedToGroq ? "bg-green-500" : "bg-red-500"}`}></div>
+                    <span className="text-sm">{isConnectedToGroq ? "Connecté" : "Déconnecté"}</span>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+            </DialogContent>
+          </Dialog>
+          
+          {/* Dialogue d'aide */}
+          <Dialog open={showHelpDialog} onOpenChange={setShowHelpDialog}>
+            <DialogContent className="sm:max-w-lg glassmorphism">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold">Aide</DialogTitle>
+              </DialogHeader>
+              <div className="py-4 space-y-6">
+                <div>
+                  <h3 className="font-medium mb-2">À propos de NovaChat</h3>
+                  <p className="text-sm text-muted-foreground">NovaChat est un assistant IA personnel propulsé par les modèles de langage de Groq.</p>
+                </div>
+                
+                <div>
+                  <h3 className="font-medium mb-2">Commandes disponibles</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <MessageSquare className="h-4 w-4 mr-2 text-blue-500" />
+                      <span className="text-sm">Nouvelle conversation - Démarrer une nouvelle discussion</span>
+                    </div>
+                    
+                    {isDeveloperMode && (
+                      <>
+                        <div className="flex items-center">
+                          <Terminal className="h-4 w-4 mr-2 text-amber-500" />
+                          <span className="text-sm">Terminal - Accéder au terminal (bientôt disponible)</span>
+                        </div>
+                        
+                        <div className="flex items-center">
+                          <Database className="h-4 w-4 mr-2 text-green-500" />
+                          <span className="text-sm">Base de données - Gérer les données (bientôt disponible)</span>
+                        </div>
+                        
+                        <div className="flex items-center">
+                          <FileCode className="h-4 w-4 mr-2 text-purple-500" />
+                          <span className="text-sm">Éditeur de code - Modifier du code (bientôt disponible)</span>
+                        </div>
+                      </>
+                    )}
+                    
+                    <div className="flex items-center">
+                      <Settings className="h-4 w-4 mr-2 text-gray-500" />
+                      <span className="text-sm">Paramètres - Configurer l'application</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="font-medium mb-2">Modes de conversation</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <MessageSquare className="h-4 w-4 mr-2 text-blue-500" />
+                      <span className="text-sm">Normal - Réponses concises et directes</span>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <Brain className="h-4 w-4 mr-2 text-purple-500" />
+                      <span className="text-sm">Reasoning - Réponses détaillées avec un raisonnement étape par étape</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
     </div>
   );
 }

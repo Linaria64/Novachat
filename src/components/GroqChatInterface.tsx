@@ -23,8 +23,10 @@ const GroqChatInterface: React.FC = () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = {
+      id: Date.now().toString(),
       role: "user",
       content: input.trim(),
+      timestamp: new Date()
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -39,7 +41,12 @@ const GroqChatInterface: React.FC = () => {
           assistantMessage += chunk;
           setMessages((prev) => [
             ...prev.slice(0, -1),
-            { role: "assistant", content: assistantMessage },
+            { 
+              id: (Date.now() + 1).toString(),
+              role: "assistant", 
+              content: assistantMessage,
+              timestamp: new Date()
+            },
           ]);
         },
         () => {
@@ -65,7 +72,7 @@ const GroqChatInterface: React.FC = () => {
           <div className="flex flex-col gap-4 p-4">
             {messages.map((message, index) => (
               <div
-                key={index}
+                key={message.id || index}
                 className={`flex ${
                   message.role === "user" ? "justify-end" : "justify-start"
                 }`}

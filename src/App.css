@@ -107,3 +107,207 @@ body {
 .read-the-docs {
   color: #888;
 }
+
+/* App container */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+  background-image: radial-gradient(
+    circle at top right,
+    rgba(23, 92, 230, 0.15),
+    rgba(65, 39, 120, 0.08) 30%,
+    rgba(0, 0, 0, 0.01) 70%
+  );
+}
+
+.dark .app-container {
+  background-image: radial-gradient(
+    circle at top right,
+    rgba(67, 56, 202, 0.12),
+    rgba(10, 10, 40, 0.05) 30%,
+    rgba(0, 0, 0, 0) 70%
+  );
+}
+
+/* Animation d'entrée pour le chat */
+.chat-message-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.chat-message-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+/* Effet de flottement pour les éléments d'UI */
+.floating-effect {
+  animation: floating 6s ease-in-out infinite;
+}
+
+@keyframes floating {
+  0% { transform: translate(0, 0px); }
+  50% { transform: translate(0, 10px); }
+  100% { transform: translate(0, 0px); }
+}
+
+/* Effet de glow pour mettre en évidence les éléments importants */
+.glow-effect {
+  position: relative;
+  z-index: 1;
+}
+
+.glow-effect::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  background: linear-gradient(45deg, rgba(59, 130, 246, 0.5), rgba(147, 51, 234, 0.5));
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  filter: blur(12px);
+}
+
+.glow-effect:hover::after {
+  opacity: 0.6;
+}
+
+.dark .glow-effect::after {
+  background: linear-gradient(45deg, rgba(59, 130, 246, 0.6), rgba(147, 51, 234, 0.6));
+}
+
+/* Effet de fluidité pour les conteneurs */
+.fluid-card {
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 
+    0 4px 10px rgba(0, 0, 0, 0.05),
+    0 10px 20px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.dark .fluid-card {
+  box-shadow: 
+    0 4px 10px rgba(0, 0, 0, 0.2),
+    0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.fluid-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 
+    0 8px 20px rgba(0, 0, 0, 0.1),
+    0 20px 30px rgba(0, 0, 0, 0.15);
+}
+
+/* Utilités pour les transitions de couleurs */
+.transition-colors {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  transition-duration: 300ms;
+}
+
+/* Effet de verre pour les dialogues et les conteneurs */
+.glass-effect {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  transition: all 0.3s ease;
+  background-image: var(--glass-gradient);
+}
+
+/* Styles pour les boutons avec bordure lumineuse */
+.neon-border-button {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.neon-border-button::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #3b82f6, #6366f1, #8b5cf6, #3b82f6);
+  background-size: 400% 400%;
+  z-index: -1;
+  animation: neonGradient 3s ease infinite;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.neon-border-button:hover::before {
+  opacity: 1;
+}
+
+@keyframes neonGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Chat bubbles with tails */
+.user-message::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  background-color: #3b82f6;
+  clip-path: polygon(0 0, 0% 100%, 100% 100%);
+  transform: rotate(-45deg);
+}
+
+.assistant-message::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: -8px;
+  width: 16px;
+  height: 16px;
+  background-color: rgba(255, 255, 255, 0.8);
+  clip-path: polygon(0 100%, 100% 0, 100% 100%);
+  transform: rotate(-45deg);
+}
+
+.dark .assistant-message::after {
+  background-color: rgba(31, 41, 55, 0.8);
+}
+
+/* Styles pour la barre de navigation */
+.nav-button {
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.nav-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  border-radius: inherit;
+  z-index: -1;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
+.nav-button:hover::before {
+  opacity: 1;
+}

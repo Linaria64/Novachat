@@ -1,583 +1,527 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { RefreshCw, Trash2, Send, Loader2, AlertCircle, Plus, Brain, MessageCircle } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Send, X, Loader2, Bot, Brain, Trash } from "lucide-react";
+import { generateGroqCompletion, checkConnection, AVAILABLE_MODELS } from "@/services/groqService";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import ChatMessage from "./ChatMessage";
-import TypingIndicator from "./TypingIndicator";
-import {
-  generateCompletionStream as generateGroqCompletion,
-  checkConnection as checkGroqConnection,
-  AVAILABLE_MODELS as GROQ_MODELS,
-  GroqModel
-} from "@/services/groqService";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { BaseMessage, MessageRole } from "@/types/chat";
-import { Toaster } from "@/components/ui/sonner";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+
+// Définir l'énumération MessageRole localement pour éviter les erreurs d'importation
+const MessageRole = {
+  User: "user" as const,
+  Assistant: "assistant" as const,
+  System: "system" as const
+};
 
 interface ChatInterfaceProps {
   className?: string;
 }
 
-interface ConversationInfo {
-  id: string;
-  title: string;
-  lastMessage: string;
-  timestamp: Date;
-}
-
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
-  // Commencer par définir tous les états
-  const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<BaseMessage[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<GroqModel>(GROQ_MODELS[0]);
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
-  const [abortController, setAbortController] = useState<(() => void) | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [conversations, setConversations] = useState<ConversationInfo[]>([]);
-  const [currentConversationId, setCurrentConversationId] = useState<string>("");
-  const [showConversationList, setShowConversationList] = useState(false);
-  const [generationMode, setGenerationMode] = useState<"normal" | "reasoning">("normal");
+const ChatInterface = ({ className }: ChatInterfaceProps) => {
+  // État du chat
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState<string>("");
+  const [isTyping, setIsTyping] = useState<boolean>(false);
+  const [selectedMode, setSelectedMode] = useState<"normal" | "reasoning">("normal");
+  const [selectedModel] = useState<string>("claude-3-opus-20240229"); // On utilise uniquement la valeur, pas le setter
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isLoadingComplete, setIsLoadingComplete] = useState<boolean>(false);
-  const [isMobile, setIsMobile] = useState<boolean>(false);
-
-  // Définir les refs
+  
+  // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Définir toutes les fonctions callback avec useCallback avant de les utiliser dans les effets
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Fonction de récupération des modèles
   const fetchModels = useCallback(async () => {
     try {
-      setIsLoadingModels(true);
-      // Code pour récupérer les modèles...
+      const isConnected = await checkConnection();
+      setIsConnected(isConnected);
     } catch (error) {
       console.error("Error fetching models:", error);
-      toast.error("Failed to fetch models");
-    } finally {
-      setIsLoadingModels(false);
+      setIsConnected(false);
+      toast.error("Impossible de récupérer les modèles. Veuillez vérifier votre connexion.");
     }
   }, []);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+  
+  // Fonction pour faire défiler vers le bas
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+  
+  // Fonction d'arrêt de la génération
+  const abortFunction = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsGenerating(false);
+      toast.info("Génération arrêtée");
+    }
+  }, []);
+  
+  // Gestionnaire d'envoi de message
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || isGenerating) return;
+    
+    // Ajouter le message de l'utilisateur
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: MessageRole.User,
+      content: input.trim(),
+      timestamp: new Date(),
+    };
+    
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsTyping(false);
+    
+    // Créer un nouveau AbortController pour cette requête
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+    
+    // Déterminer le modèle à utiliser en fonction du mode
+    let modelToUse = selectedModel;
+    
+    // Si le mode est "reasoning", utiliser Qwen-32B
+    if (selectedMode === "reasoning") {
+      // Rechercher le modèle Qwen dans les modèles disponibles
+      const qwenModel = AVAILABLE_MODELS.find(model => model.id === "qwen-qwq-32b");
+      if (qwenModel) {
+        modelToUse = qwenModel.id;
+      }
+    }
+    
+    try {
+      setIsGenerating(true);
+      
+      // Créer un message vide pour l'assistant
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: MessageRole.Assistant,
+        content: "",
+        timestamp: new Date(),
+      };
+      
+      setMessages((prev) => [...prev, assistantMessage]);
+      
+      // Scroll au message vide immédiatement
+      setTimeout(scrollToBottom, 100);
+      
+      // Obtenir le contexte de conversation
+      const conversationContext = messages
+        .slice(-10) // Utiliser les 10 derniers messages pour le contexte
+        .map((msg) => ({
+          role: msg.role.toLowerCase(),
+          content: msg.content,
+        }));
+      
+      // Ajouter le message de l'utilisateur au contexte
+      conversationContext.push({
+        role: "user",
+        content: input.trim(),
+      });
+      
+      // Générer la complétion
+      const response = await generateGroqCompletion(
+        modelToUse,
+        conversationContext,
+        signal
+      );
+      
+      // Mettre à jour le message de l'assistant avec la réponse
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantMessage.id
+            ? { ...msg, content: response }
+            : msg
+        )
+      );
+    } catch (error: any) {
+      // Vérifier si c'est une erreur d'abandon
+      if (error.name === "AbortError") {
+        // Supprimer le dernier message (message vide de l'assistant)
+        setMessages((prev) => prev.slice(0, -1));
+        return;
+      }
+      
+      console.error("Error generating completion:", error);
+      
+      // Afficher le message d'erreur
+      toast.error(`Erreur: ${error.message || "Une erreur est survenue"}`);
+      
+      // Mettre à jour le message de l'assistant avec l'erreur
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === (prev[prev.length - 1]?.id || "")
+            ? {
+                ...msg,
+                content:
+                  "Désolé, une erreur est survenue lors de la génération de la réponse.",
+              }
+            : msg
+        )
+      );
+    } finally {
+      abortControllerRef.current = null;
+      setIsGenerating(false);
+      
+      // Scroll après avoir reçu la réponse
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [input, isGenerating, messages, scrollToBottom, selectedMode, selectedModel]);
+  
+  // Gestionnaire de saisie (typing)
+  const handleTyping = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    setIsTyping(e.target.value.length > 0);
+  }, []);
+  
+  // Gestionnaire d'appui sur les touches
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  }, [input, isConnected, isTyping, isLoadingComplete]);
-
-  const handleSend = useCallback(() => {
-    if (!input.trim() || !isConnected || isTyping || !isLoadingComplete) return;
-    
-    const userMessage: BaseMessage = {
-      role: "user",
-      content: input.trim(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsTyping(true);
-    setError(null);
-
-    try {
-      let systemPrompt = "";
-      // Sélectionner le modèle en fonction du mode
-      let modelId = selectedModel.id;
-      
-      // En mode reasoning, utiliser Qwen QWQ 32B
-      if (generationMode === "reasoning") {
-        // Trouver le modèle Qwen QWQ 32B
-        const qwenModel = GROQ_MODELS.find(model => model.id === "qwen-qwq-32b");
-        if (qwenModel) {
-          modelId = qwenModel.id;
-        }
-        systemPrompt = "Vous êtes un assistant IA qui expose son raisonnement étape par étape. Pour chaque réponse, commencez par une analyse détaillée du problème, puis développez votre raisonnement de manière claire et structurée avant de donner votre conclusion finale.";
-      } else {
-        systemPrompt = "Vous êtes un assistant IA concis et direct. Répondez de manière claire et efficace.";
-      }
-      
-      // Fonction pour configurer le contrôleur d'abandon
-      const setupAbortController = () => {
-        const abort = () => {
-          console.log("Generation aborted by user");
-          setIsTyping(false);
-          toast.info("Génération arrêtée");
-        };
-        setAbortController(() => abort);
-      };
-      
-      // Configurer le contrôleur d'abandon
-      setupAbortController();
-      
-      // Appeler l'API Groq pour générer une réponse
-      generateGroqCompletion(
-        modelId,
-        [{ role: "system", content: systemPrompt }, ...messages, userMessage],
-        (chunk: string) => {
-          setMessages((prev) => {
-            const newMessages = [...prev];
-            const lastMessage = newMessages[newMessages.length - 1];
-            
-            if (lastMessage && lastMessage.role === "assistant") {
-              return [
-                ...newMessages.slice(0, -1),
-                { ...lastMessage, content: lastMessage.content + chunk },
-              ];
-            }
-            
-            return [
-              ...newMessages,
-              { role: "assistant" as MessageRole, content: chunk },
-            ];
-          });
-        },
-        () => {
-          setIsTyping(false);
-          setAbortController(null);
-        },
-        () => {
-          setError("Échec de la génération de la réponse");
-          setIsTyping(false);
-          setAbortController(null);
-        }
-      );
-    } catch (error) {
-      console.error("Error in handleSend:", error);
-      setError("Échec de la génération de la réponse");
-      setIsTyping(false);
-      setAbortController(null);
-    }
-  }, [input, messages, selectedModel, isConnected, isTyping, isLoadingComplete, generationMode]);
-
-  const stopGeneration = useCallback(() => {
-    if (abortController) {
-      abortController();
-      setAbortController(null);
-      setIsTyping(false);
-    }
-  }, [abortController]);
-
-  const clearConversation = useCallback(() => {
+  }, [handleSend]);
+  
+  // Fonction pour vider les messages
+  const clearMessages = useCallback(() => {
     setMessages([]);
-    toast.success("Conversation cleared");
-  }, []);
-
-  // Maintenant définir les effets avec useEffect
-  // Détecter si l'appareil est mobile
-  useEffect(() => {
-    const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    // Vérifier au chargement
-    checkIfMobile();
-    
-    // Ajouter un écouteur de redimensionnement
-    window.addEventListener('resize', checkIfMobile);
-    
-    // Nettoyer l'écouteur
-    return () => window.removeEventListener('resize', checkIfMobile);
-  }, []);
-
-  // Message de bienvenue
-  useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          role: "assistant",
-          content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
-        }
-      ]);
+    // Stopper toute génération en cours
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsGenerating(false);
     }
-  }, [messages.length]);
-
-  // Vérifier si l'application est prête
+  }, []);
+  
+  // Gestionnaire de changement de mode
+  const handleModeChange = useCallback((mode: "normal" | "reasoning") => {
+    setSelectedMode(mode);
+  }, []);
+  
+  // Vérification de l'état de chargement
   useEffect(() => {
-    // Fonction pour vérifier l'état du chargement
-    const checkIfReady = () => {
-      const isAppReady = !document.body.classList.contains('loading-active');
-      setIsLoadingComplete(isAppReady);
-      
-      // Si toujours en chargement, vérifier à nouveau dans 500ms
-      if (!isAppReady) {
-        setTimeout(checkIfReady, 500);
-      } else {
-        console.log("Application chargée - interface de chat activée");
-      }
+    // Vérifier si le corps a la classe 'loading-active'
+    const checkLoading = () => {
+      const isLoading = document.body.classList.contains('loading-active');
+      setIsLoadingComplete(!isLoading);
     };
     
-    // Vérifier l'état initial
-    checkIfReady();
+    // Vérifier immédiatement
+    checkLoading();
     
-    // Écouter l'événement global de fin de chargement
+    // Vérifier régulièrement
+    const intervalId = setInterval(checkLoading, 500);
+    
+    // Écouter l'événement de fin de chargement
     const handleLoadingComplete = () => {
-      console.log("Événement de fin de chargement reçu");
+      console.log("Loading complete event received");
       setIsLoadingComplete(true);
     };
     
     window.addEventListener('novachat:loading-complete', handleLoadingComplete);
     
     return () => {
+      clearInterval(intervalId);
       window.removeEventListener('novachat:loading-complete', handleLoadingComplete);
     };
   }, []);
-
+  
   // Vérifier la connexion au chargement
   useEffect(() => {
-    const checkGroqConnectionStatus = async () => {
-      try {
-        console.log("Vérification de la connexion à Groq...");
-        const connected = await checkGroqConnection();
-        setIsConnected(connected);
-        
-        if (connected) {
-          fetchModels();
-          console.log("Connexion à Groq établie avec succès");
-        } else {
-          setError("Impossible de se connecter à l'API Groq. Veuillez vérifier votre connexion internet et vos paramètres.");
-          console.error("Échec de la connexion à Groq");
-        }
-      } catch (error) {
-        console.error("Erreur lors de la vérification de la connexion:", error);
-        setIsConnected(false);
-        setError("Erreur de connexion. Veuillez réessayer plus tard.");
-      }
-    };
-
-    checkGroqConnectionStatus();
-  }, [fetchModels]);
-
-  // Setup interval to check connection status
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const connected = await checkGroqConnection();
-        
-        if (connected !== isConnected) {
-          setIsConnected(connected);
-          if (connected && !isConnected) {
-            fetchModels();
-            toast.success("Connexion à Groq établie");
-            setError(null);
-          } else if (!connected && isConnected) {
-            toast.error("Connexion à Groq perdue");
-            setError("Connexion à Groq perdue. Tentative de reconnexion...");
-          }
-        }
-      } catch (error) {
-        console.error("Erreur lors de la vérification de la connexion:", error);
-      }
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [isConnected, fetchModels]);
-
-  useEffect(() => {
     fetchModels();
+    
+    // Vérifier la connexion périodiquement
+    const intervalId = setInterval(fetchModels, 30000);
+    
+    return () => clearInterval(intervalId);
   }, [fetchModels]);
-
-  // Scroll to bottom when messages change
+  
+  // Effet pour faire défiler vers le bas lorsque les messages changent
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, isTyping]);
-
-  // Save selected model to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem("chatopia-selected-model", selectedModel.id);
-  }, [selectedModel]);
-
-  // Save messages to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem("chatopia-messages", JSON.stringify(messages));
-  }, [messages]);
-
-  // Focus input when connection status changes
-  useEffect(() => {
-    if (isConnected && !isTyping) {
-      inputRef.current?.focus();
-    }
-  }, [isConnected, isTyping]);
-
-  // Generate a title for a conversation based on the first message
-  const generateConversationTitle = useCallback((content: string) => {
-    return content.length > 25 ? content.substring(0, 25) + '...' : content;
-  }, []);
-
-  // Create a new conversation
-  const createNewConversation = useCallback(() => {
-    const newId = Date.now().toString();
-    setCurrentConversationId(newId);
-    setMessages([
-      {
-        role: "assistant",
-        content: "👋 Bonjour et bienvenue sur NovaChat!\n\nJe suis votre assistant IA personnel. Vous pouvez me poser toutes vos questions et je ferai de mon mieux pour vous aider.\n\nPour commencer une nouvelle conversation, cliquez sur l'icône en haut à gauche.\nPour changer de thème, utilisez l'icône soleil/lune en bas de la barre latérale."
-      }
-    ]);
-    setInput("");
-    setError(null);
-    toast.success("New conversation started");
-  }, []);
-
-  // Ajouter un écouteur d'événements pour la création d'une nouvelle conversation
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+  
+  // Écouter l'événement pour créer une nouvelle conversation
   useEffect(() => {
     const handleNewConversation = () => {
-      createNewConversation();
+      clearMessages();
     };
-
+    
     window.addEventListener('novachat:new-conversation', handleNewConversation);
     
     return () => {
       window.removeEventListener('novachat:new-conversation', handleNewConversation);
     };
-  }, [createNewConversation]);
-
-  // Save current conversation
-  const saveCurrentConversation = useCallback(() => {
-    if (messages.length === 0) return;
-    
-    const userMessage = messages.find(msg => msg.role === "user");
-    if (!userMessage) return;
-    
-    const title = generateConversationTitle(userMessage.content);
-    const lastMessage = messages[messages.length - 1].content;
-    
-    const conversation: ConversationInfo = {
-      id: currentConversationId || Date.now().toString(),
-      title,
-      lastMessage,
-      timestamp: new Date()
-    };
-    
-    setConversations(prev => {
-      const filtered = prev.filter(c => c.id !== conversation.id);
-      return [conversation, ...filtered];
-    });
-    
-    if (!currentConversationId) {
-      setCurrentConversationId(conversation.id);
-    }
-  }, [messages, currentConversationId, generateConversationTitle]);
-
-  // Load a conversation
-  const loadConversation = useCallback((id: string) => {
-    // Here you would typically load the conversation from storage
-    // For now we'll just set the ID and close the sidebar
-    setCurrentConversationId(id);
-    setShowConversationList(false);
-  }, []);
-
-  // The conversation list sidebar/dialog
-  const conversationList = (
-    <Dialog open={showConversationList} onOpenChange={setShowConversationList}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Your conversations</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-1 max-h-[50vh] overflow-y-auto pr-2">
-          {conversations.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No conversations yet</p>
-            </div>
-          ) : (
-            conversations.map((conv) => (
-              <button
-                key={conv.id}
-                className={cn(
-                  "w-full px-3 py-2 rounded-lg text-left hover:bg-muted/60 transition-colors",
-                  conv.id === currentConversationId && "bg-muted"
-                )}
-                onClick={() => loadConversation(conv.id)}
-              >
-                <div className="font-medium truncate">{conv.title}</div>
-                <div className="text-xs text-muted-foreground truncate">{conv.lastMessage}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {conv.timestamp.toLocaleDateString()}
-                </div>
-              </button>
-            ))
-          )}
-        </div>
-        <Button onClick={createNewConversation} className="w-full mt-2">
-          <Plus className="h-4 w-4 mr-2" />
-          New conversation
-        </Button>
-      </DialogContent>
-    </Dialog>
-  );
-
-  // Save conversation when messages change
-  useEffect(() => {
-    saveCurrentConversation();
-  }, [messages, saveCurrentConversation]);
-
-  // Charger le modèle sélectionné depuis le localStorage
-  useEffect(() => {
-    const loadSelectedModel = () => {
-      const savedModelId = localStorage.getItem("chatopia-selected-model");
-      if (savedModelId) {
-        const foundModel = GROQ_MODELS.find(model => model.id === savedModelId);
-        if (foundModel) {
-          setSelectedModel(foundModel);
-        }
-      }
-    };
-    
-    loadSelectedModel();
-  }, []);
+  }, [clearMessages]);
+  
+  // Déterminer l'état de connexion pour l'affichage
+  const connectionStatus = isGenerating 
+    ? "busy" 
+    : isConnected 
+      ? "online" 
+      : "offline";
+  
+  // Déterminer le message de statut
+  const statusMessage = {
+    online: "Connecté",
+    busy: "Génération en cours...",
+    offline: "Déconnecté"
+  };
+  
+  // Déterminer le modèle affiché
+  const displayModel = selectedMode === "reasoning" 
+    ? "Qwen-32B" 
+    : "Claude-3";
 
   return (
-    <div className={`flex flex-col h-full overflow-hidden ${className}`}>
-      {/* Main chat area with iOS-like background */}
-      <div className="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-900 relative">
-        {/* iOS-like background pattern */}
-        <div className="absolute inset-0 opacity-10 dark:opacity-5 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMjIiIGZpbGwtb3BhY2l0eT0iMC40Ij48cGF0aCBkPSJNNTQgMTEwYzAtNi42MjcgNS4zNzMtMTIgMTItMTJzMTIgNS4zNzMgMTIgMTItNS4zNzMgMTItMTIgMTItMTItNS4zNzMtMTItMTJ6bTE4IDBjMC0zLjMxMy0yLjY4Ny02LTYtNnMtNiAyLjY4Ny02IDYgMi42ODcgNiA2IDYgNi0yLjY4NyA2LTZ6Ii8+PHBhdGggZD0iTTEyMSAxMTBjMC02LjYyNyA1LjM3My0xMiAxMi0xMnMxMiA1LjM3MyAxMiAxMi01LjM3MyAxMi0xMiAxMi0xMi01LjM3My0xMi0xMnptMTggMGMwLTMuMzEzLTIuNjg3LTYtNi02cy02IDIuNjg3LTYgNiAyLjY4NyA2IDYgNiA2LTIuNjg3IDYtNnptMTIzIDNjMC02LjYyNyA1LjM3My0xMiAxMi0xMnMxMiA1LjM3MyAxMiAxMi01LjM3MyAxMi0xMiAxMi0xMi01LjM3My0xMi0xMnptMTggMGMwLTMuMzEzLTIuNjg3LTYtNi02cy02IDIuNjg3LTYgNiAyLjY4NyA2IDYgNiA2LTIuNjg3IDYtNnp6Ii8+PC9nPjwvZz48L3N2Zz4=')]"></div>
-
-        <ScrollArea className="h-full py-6 px-2 sm:px-4 pb-20">
-          <div className="space-y-2 w-full max-w-3xl mx-auto pb-24">
-            {messages.map((message, index) => (
-              <ChatMessage
-                key={index}
-                role={message.role}
-                content={message.content}
-              />
-            ))}
-            {isTyping && <TypingIndicator />}
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
-      </div>
-
-      {/* Footer with actions and input */}
-      <div className={`bg-gray-50 dark:bg-gray-800 py-3 sm:py-4 px-4 border-t dark:border-gray-700 ${isMobile ? 'mb-16' : ''}`}>
-        <div className="flex flex-col gap-3 w-[95%] sm:w-[90%] md:w-[80%] lg:w-[70%] mx-auto">
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          
-          {/* Boutons de mode */}
-          <div className="flex justify-center space-x-2 mb-2">
-            <Button
-              variant={generationMode === "normal" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setGenerationMode("normal")}
-              className="rounded-full"
-              disabled={!isLoadingComplete}
-            >
-              <MessageCircle className="h-4 w-4 mr-1" />
-              Normal
-            </Button>
-            <Button
-              variant={generationMode === "reasoning" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setGenerationMode("reasoning")}
-              className="rounded-full"
-              disabled={!isLoadingComplete}
-            >
-              <Brain className="h-4 w-4 mr-1" />
-              Reasoning
-            </Button>
-          </div>
-          
-          <div className="flex gap-2 items-end">
-            {messages.length > 1 && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={clearConversation}
-                title="Clear conversation"
-                className="h-9 w-9 flex-shrink-0"
-                disabled={!isLoadingComplete}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
+    <div className={cn("h-screen flex flex-col p-4", className)}>
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto rounded-xl glassmorphism shadow-lg mb-4 p-4 relative">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center mb-4 floating-effect">
+              <Bot className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Bienvenue sur NovaChat</h3>
+            <p className="text-muted-foreground max-w-md">
+              Envoyez un message pour commencer une conversation avec l'IA.
+              <br />
+              {selectedMode === "normal" 
+                ? "Mode normal : réponses concises et directes." 
+                : "Mode reasoning : réponses détaillées avec explication du raisonnement."}
+            </p>
             
-            <div className="flex-1 flex bg-white dark:bg-gray-700 rounded-full shadow-md focus-within:ring-1 focus-within:ring-primary">
-              <Input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={isLoadingComplete ? "Type your message..." : "Chargement en cours..."}
-                disabled={!isConnected || isTyping || !isLoadingComplete}
-                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 rounded-full px-3 sm:px-4 py-2 text-sm sm:text-base"
-              />
-              
-              <div className="hidden sm:flex items-center px-2 text-xs text-gray-500 dark:text-gray-400 border-l border-gray-200 dark:border-gray-600">
-                <div className={`w-2 h-2 rounded-full mr-2 ${
-                  isConnected 
-                    ? isTyping 
-                      ? "bg-yellow-400 animate-pulse" 
-                      : "bg-green-500" 
-                    : "bg-red-500"
-                }`}></div>
-                <span>
-                  {generationMode === "reasoning" 
-                    ? "Qwen-32B" 
-                    : selectedModel.name.split(' ')[0]}
-                </span>
-              </div>
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant={selectedMode === "normal" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleModeChange("normal")}
+                className={cn(
+                  "flex items-center gap-2 h-10",
+                  selectedMode === "normal" && "bg-gradient-primary",
+                  "hover-scale"
+                )}
+              >
+                <Bot className="w-4 h-4" />
+                <span>Normal</span>
+              </Button>
               
               <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleSend}
-                disabled={!isConnected || !input.trim() || isTyping || !isLoadingComplete || isLoadingModels}
-                className="rounded-r-full h-9 w-9"
-              >
-                {isTyping || isLoadingModels ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
+                variant={selectedMode === "reasoning" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleModeChange("reasoning")}
+                className={cn(
+                  "flex items-center gap-2 h-10",
+                  selectedMode === "reasoning" && "bg-gradient-secondary",
+                  "hover-scale"
                 )}
+              >
+                <Brain className="w-4 h-4" />
+                <span>Reasoning</span>
               </Button>
             </div>
-            
-            {isTyping && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={stopGeneration}
-                title="Stop generation"
-                className="h-9 w-9 flex-shrink-0"
-                disabled={!isLoadingComplete}
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            )}
           </div>
-
-          {/* Version mobile de l'indicateur */}
-          <div className="flex sm:hidden items-center justify-center mt-2 text-xs text-gray-500 dark:text-gray-400">
-            <div className={`w-2 h-2 rounded-full mr-2 ${
-              isConnected 
-                ? isTyping 
-                  ? "bg-yellow-400 animate-pulse" 
-                  : "bg-green-500" 
-                : "bg-red-500"
-            }`}></div>
-            <span>
-              {generationMode === "reasoning" 
-                ? "Qwen-32B" 
-                : selectedModel.name.split(' ')[0]}
-            </span>
+        ) : (
+          <div className="space-y-4 pt-2 pb-20">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={cn(
+                  "flex flex-col relative",
+                  message.role === MessageRole.User ? "items-end" : "items-start"
+                )}
+              >
+                <div
+                  className={cn(
+                    "message-container position-relative",
+                    message.role === MessageRole.User
+                      ? "user-message"
+                      : "assistant-message"
+                  )}
+                >
+                  <div className="whitespace-pre-wrap">
+                    {message.content ? (
+                      <Markdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          pre({ node, className, children, ...props }) {
+                            return (
+                              <pre className="bg-gray-800 text-gray-100 rounded-md p-4 overflow-x-auto my-2 text-sm" {...props}>
+                                {children}
+                              </pre>
+                            );
+                          },
+                          code({ node, className, children, ...props }) {
+                            return <code className="bg-gray-200 dark:bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>;
+                          }
+                        }}
+                      >
+                        {message.content}
+                      </Markdown>
+                    ) : (
+                      <div className="typing-indicator">
+                        <div className="typing-dot"></div>
+                        <div className="typing-dot"></div>
+                        <div className="typing-dot"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1 px-2">
+                  {message.timestamp.toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+      
+      <div className="relative">
+        <div className="chat-input-container">
+          <div className="flex items-center gap-2 px-2">
+            <div className={`status-indicator status-${connectionStatus}`}>
+              <span className={`status-dot ${connectionStatus}`}></span>
+              <span className="hidden sm:inline text-xs">{statusMessage[connectionStatus]}</span>
+            </div>
+            <div className="model-badge">
+              <span className="hidden sm:inline">{displayModel}</span>
+              <span className="sm:hidden">{selectedMode === "reasoning" ? "Qwen" : "Claude"}</span>
+            </div>
+          </div>
+          
+          <Textarea
+            ref={inputRef}
+            value={input}
+            onChange={handleTyping}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              !isLoadingComplete
+                ? "Chargement..."
+                : `Message ${selectedMode === "reasoning" ? "(mode reasoning)" : ""}`
+            }
+            className="chat-input min-h-[60px] resize-none py-3"
+            disabled={!isLoadingComplete || isGenerating}
+            rows={1}
+            data-mode={selectedMode}
+          />
+          
+          <div className="absolute right-2 bottom-3 flex items-center gap-2">
+            {isGenerating ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={abortFunction}
+                className="h-8 w-8 rounded-full"
+              >
+                <X className="h-5 w-5 text-red-500" />
+              </Button>
+            ) : (
+              isTyping && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setInput("")}
+                  className="h-8 w-8 rounded-full"
+                >
+                  <X className="h-5 w-5 text-gray-400" />
+                </Button>
+              )
+            )}
+            
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={handleSend}
+              disabled={!input.trim() || !isLoadingComplete || isGenerating}
+              className="h-10 w-10 rounded-full bg-gradient-primary text-white disabled:opacity-50 disabled:pointer-events-none hover:opacity-90"
+            >
+              {isGenerating ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+            </Button>
           </div>
         </div>
+        
+        {messages.length > 0 && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={clearMessages}
+                  className="absolute right-0 -top-12 h-9 w-9 rounded-full"
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Vider la conversation</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        
+        {/* Button to switch modes */}
+        {messages.length > 0 && (
+          <div className="absolute left-0 -top-12 flex gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={selectedMode === "normal" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleModeChange("normal")}
+                    className={cn(
+                      "h-9 px-3",
+                      selectedMode === "normal" && "bg-gradient-primary"
+                    )}
+                  >
+                    <Bot className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Mode normal</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={selectedMode === "reasoning" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleModeChange("reasoning")}
+                    className={cn(
+                      "h-9 px-3",
+                      selectedMode === "reasoning" && "bg-gradient-secondary"
+                    )}
+                  >
+                    <Brain className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Mode reasoning</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
       </div>
-
-      {/* Render the conversation list dialog */}
-      {conversationList}
-
-      <Toaster position="top-center" />
     </div>
   );
 };

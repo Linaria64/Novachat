@@ -109,6 +109,58 @@ export async function checkConnection(): Promise<boolean> {
   }
 }
 
+// Nouvelle fonction pour générer une complétion non streamée avec support d'annulation
+export const generateGroqCompletion = async (
+  model: string,
+  messages: { role: string; content: string; }[],
+  signal?: AbortSignal
+): Promise<string> => {
+  try {
+    console.log("Generating completion with Groq...");
+    const apiKey = getApiKey();
+    
+    if (!apiKey) {
+      toast.error("No Groq API key found. Please set it in the settings.");
+      throw new Error("No API key found");
+    }
+    
+    const response = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.7,
+        max_tokens: 4096,
+        top_p: 0.95,
+        frequency_penalty: 0,
+        presence_penalty: 0
+      }),
+      signal
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("Groq API error:", error);
+      toast.error(`Groq API error: ${error.error?.message || response.statusText}`);
+      throw new Error(error.error?.message || response.statusText);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error("Error in generateGroqCompletion:", error);
+    // Ne pas afficher de toast si l'erreur est une annulation de l'utilisateur
+    if ((error as Error).name !== 'AbortError') {
+      toast.error(`Failed to generate response: ${(error as Error).message || 'Unknown error'}`);
+    }
+    throw error;
+  }
+};
+
 // Stream completion
 export const generateCompletionStream = async (
   model: string,
