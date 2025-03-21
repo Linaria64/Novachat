@@ -561,3 +561,121 @@ body {
 .dark :focus-visible {
   outline-color: #818cf8;
 }
+
+/* Base styles */
+.main-container {
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: 80px;
+}
+
+/* Navigation styles */
+.nav-button {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 9999px;
+  transition: all 0.2s ease-out;
+}
+
+.nav-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  transform: translateX(4px);
+}
+
+.dark .nav-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Glassmorphism effect */
+.glassmorphism {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark .glassmorphism {
+  background: rgba(30, 30, 30, 0.7);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Mobile navigation */
+.mobile-navbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 30;
+}
+
+.dark .mobile-navbar {
+  background: rgba(30, 30, 30, 0.8);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.mobile-navbar-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+}
+
+.mobile-navbar-button:active {
+  transform: scale(0.95);
+}
+
+.mobile-optimized {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Loading screen styles */
+.loading-active {
+  overflow: hidden;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+/* Gradients */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+}
+
+.bg-gradient-secondary {
+  background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+}
+
+/* Important overrides to force visibility */
+.translate-x-\[-70\%\] {
+  transform: translateX(-70%) !important;
+}
+
+/* Fix for the sidebar to ensure it's visible */
+.fixed.left-0.top-0.h-full.glassmorphism {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}

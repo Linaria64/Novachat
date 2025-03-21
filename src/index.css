@@ -30,7 +30,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 215 20.2% 65.1%;
     --radius: 0.5rem;
 
     /* Sidebar theme */
@@ -73,10 +73,10 @@
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 85.7% 97.3%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --ring: 217.2 32.6% 17.5%;
     
     /* Sidebar theme */
     --sidebar-background: 240 5.9% 10%;
@@ -851,4 +851,54 @@ body.loading-active textarea {
   main.pb-20 {
     padding-bottom: 5rem !important;
   }
+}
+
+/* Force visibility for all elements that might be hidden by opacity or transform */
+* {
+  transition: transform 300ms ease, opacity 300ms ease, visibility 300ms ease;
+}
+
+/* Fix for the Tailwind translate classes that were not working */
+.translate-x-\[-70\%\] {
+  transform: translateX(-70%) !important;
+}
+
+.w-24 {
+  width: 6rem !important;
+}
+
+.w-64 {
+  width: 16rem !important;
+}
+
+/* Override hidden elements */
+.glassmorphism {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Debug outline for development */
+.debug * {
+  outline: 1px solid red;
+}
+
+/* Fix for mobile view */
+@media (max-width: 768px) {
+  .mobile-navbar {
+    display: flex !important;
+  }
+}
+
+/* Fix for desktop view */
+@media (min-width: 769px) {
+  .fixed.left-0.top-0.h-full {
+    display: block !important;
+  }
+}
+
+/* Prevent content shifting */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
 }
