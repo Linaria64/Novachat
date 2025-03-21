@@ -148,14 +148,14 @@ function App() {
           {!isMobile && (
             <div 
               className={`fixed left-0 top-0 h-full glassmorphism z-30 transition-all duration-300 ease-out shadow-lg ${
-                showNavbar ? 'w-64 translate-x-0' : 'w-24 translate-x-[-70%]'
+                showNavbar ? 'w-64 translate-x-0' : 'w-24 translate-x-[-50%]'
               }`}
               onMouseEnter={() => setShowNavbar(true)}
               onMouseLeave={() => setShowNavbar(false)}
             >
               {/* Logo et titre */}
               <div className="w-full flex justify-center items-center py-6 mb-8">
-                <div className={`flex items-center justify-center transition-all duration-300 ${showNavbar ? 'ml-0' : 'ml-14'}`}>
+                <div className={`flex items-center justify-center transition-all duration-300 ${showNavbar ? 'ml-0' : 'ml-10'}`}>
                   <div className={`p-2 rounded-full transition-all ${isDeveloperMode ? "bg-gradient-to-br from-amber-500 to-red-600" : "bg-gradient-to-br from-blue-500 to-indigo-600"}`}>
                     <Bot size={28} className="text-white" />
                   </div>
