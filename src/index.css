@@ -110,6 +110,16 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 
+  /* Amélioration pour le mobile */
+  @media (max-width: 767px) {
+    html, body, #root {
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior-y: contain;
+      -webkit-overflow-scrolling: touch; /* Pour une meilleure inertie de défilement sur iOS */
+    }
+  }
+
   /* Scrollbar styling */
   ::-webkit-scrollbar {
     width: 8px;
@@ -127,6 +137,14 @@
   
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-gray-400 dark:bg-gray-600;
+  }
+
+  /* Mobile scrollbar styles - thinner and more subtle */
+  @media (max-width: 767px) {
+    ::-webkit-scrollbar {
+      width: 3px;
+      height: 3px;
+    }
   }
 }
 
@@ -209,24 +227,45 @@
 
   /* Mobile navigation */
   .mobile-navbar {
-    @apply fixed bottom-8 left-1/2 transform -translate-x-1/2 flex flex-row items-center justify-center gap-2 p-1.5 z-40 glassmorphism rounded-full border border-gray-300/30 dark:border-gray-700/30 shadow-lg;
+    @apply fixed bottom-6 left-1/2 transform -translate-x-1/2 flex flex-row items-center justify-center gap-3 p-2 z-40 glassmorphism rounded-full border border-gray-300/30 dark:border-gray-700/30 shadow-lg;
     animation: slideUp 0.5s ease-out forwards;
-    max-width: 90%;
-    padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+    max-width: 95%;
     width: auto;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0.5rem));
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   }
 
   .mobile-navbar-button {
-    @apply w-10 h-10 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 hover:scale-105 active:scale-95;
+    @apply w-11 h-11 rounded-full flex items-center justify-center shadow-sm transition-all duration-300;
+    transform-origin: center;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+  }
+  
+  .mobile-navbar-button:active {
+    transform: scale(0.9);
   }
 
   /* Ensure chat input is positioned correctly on mobile */
   @media (max-width: 767px) {
     .chat-input-container {
-      @apply pb-20; /* Space for the mobile navbar */
-      padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0.5rem));
       position: relative;
       z-index: 30;
+      padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0.5rem));
+      margin-bottom: 0.5rem;
+    }
+    
+    /* Container principal ajusté pour le mobile */
+    .main-container {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100% - env(safe-area-inset-bottom, 0.5rem));
+      padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+    }
+    
+    /* Amélioration des messages pour la vue mobile */
+    .message-container {
+      max-width: 90% !important;
+      position: relative;
     }
   }
 
@@ -567,5 +606,52 @@ body.loading-active textarea {
   
   .bg-gradient-accent {
     background: linear-gradient(135deg, rgba(236, 72, 153, 0.8), rgba(219, 39, 119, 0.8));
+  }
+}
+
+/* Optimisations pour les appareils mobiles */
+@media (max-width: 767px) {
+  .mobile-optimized {
+    padding: 0.75rem !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+  
+  .mobile-optimized .message-container {
+    padding: 1rem !important;
+  }
+  
+  .mobile-optimized pre {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  
+  .mobile-optimized .user-badge,
+  .mobile-optimized .assistant-badge {
+    font-size: 0.6rem;
+    padding: 0.15rem 0.5rem;
+  }
+  
+  /* Meilleur responsive pour l'input */
+  .mobile-optimized .chat-input {
+    font-size: 1rem;
+    line-height: 1.5;
+    padding-right: 5rem; /* Espace pour les boutons */
+  }
+  
+  /* Animation d'entrée spécifique pour mobile */
+  .mobile-optimized .message-container {
+    animation: mobile-message-in 0.3s ease-out;
+  }
+  
+  @keyframes mobile-message-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }

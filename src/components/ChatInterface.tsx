@@ -373,15 +373,15 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
     : "Llama 3.3-70B";
 
   return (
-    <div className={cn("h-screen flex flex-col p-4", className)}>
-      <div ref={chatContainerRef} className="flex-1 overflow-y-auto rounded-xl glassmorphism shadow-lg mb-4 p-4 relative">
+    <div className={cn("h-screen flex flex-col p-4 mobile-optimized", className)}>
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto rounded-xl glassmorphism shadow-lg mb-4 p-3 md:p-4 relative">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+          <div className="flex flex-col items-center justify-center h-full p-4 md:p-6 text-center">
             <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center mb-4 floating-effect">
               <Bot className="w-8 h-8 text-white" />
             </div>
             <h3 className="text-xl font-semibold mb-2">Bienvenue sur NovaChat</h3>
-            <p className="text-muted-foreground max-w-md">
+            <p className="text-muted-foreground max-w-md text-sm md:text-base">
               Envoyez un message pour commencer une conversation avec l'IA.
               <br />
               {selectedMode === "normal" 
@@ -420,7 +420,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
             </div>
           </div>
         ) : (
-          <div className="space-y-4 pt-2 pb-20">
+          <div className="space-y-4 pt-2 pb-16 md:pb-20">
             {messages.map((message) => (
               <div
                 key={message.id}
