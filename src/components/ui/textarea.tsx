@@ -7,22 +7,31 @@ export interface TextareaProps
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, ...props }, ref) => {
-    // Gestion auto-resize
     const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
       const target = e.target as HTMLTextAreaElement;
       target.style.height = 'auto';
-      const newHeight = Math.min(target.scrollHeight, 200); // Limite à 200px max
+      const maxHeight = window.innerWidth < 768 ? 150 : 200; // Responsive max height
+      const newHeight = Math.min(target.scrollHeight, maxHeight);
       target.style.height = `${newHeight}px`;
     };
 
     return (
       <textarea
         className={cn(
-          "flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-          // Nouveaux styles pour améliorer l'apparence dans l'interface de chat
-          "resize-none transition-all duration-200 ease-in-out",
-          // Focus styles améliorés
-          "focus:border-primary/20 focus:bg-background/5 focus:shadow-inner",
+          // Base styles
+          "flex min-h-[60px] w-full rounded-xl bg-background/70 px-4 py-3 text-base",
+          "placeholder:text-muted-foreground/70",
+          // Enhanced focus styles
+          "focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-background/90",
+          // Animation and transition
+          "resize-none transition-all duration-200 ease-out",
+          // Shadow effects
+          "shadow-inner hover:shadow-inner-lg",
+          // Disabled state
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          // Custom scrollbar
+          "scrollbar-thin scrollbar-thumb-primary/10 scrollbar-track-transparent",
+          // Additional classes
           className
         )}
         ref={ref}

@@ -1,131 +1,74 @@
-import Markdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
+import { Message } from "@/types/chat";
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { ComponentProps } from 'react';
 
-const ChatMessage = ({
-  role,
-  content,
-}: {
-  role: "user" | "assistant" | "system";
-  content: string;
-}) => {
-  // Split the content by newlines to preserve formatting
-  const paragraphs = content.split("\n");
+interface ChatMessageProps {
+  message: Message;
+}
 
-  const isUser = role === "user";
-  const isSystem = role === "system";
-  
+type MarkdownPreProps = ComponentProps<'pre'>;
+type MarkdownCodeProps = ComponentProps<'code'>;
+type MarkdownParagraphProps = ComponentProps<'p'>;
+
+export const ChatMessage = ({ message }: ChatMessageProps) => {
   return (
     <div
       className={cn(
-        "flex mb-4",
-        isUser ? "justify-end pl-10 sm:pl-20" : "justify-start pr-10 sm:pr-20"
+        "flex w-full max-w-3xl mx-auto py-2",
+        message.role === "user" ? "justify-end" : "justify-start"
       )}
     >
       <div
         className={cn(
-          "px-4 py-3 max-w-[85%] sm:max-w-[75%] shadow-sm",
-          isUser
-            ? "bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl rounded-br-sm"
-            : isSystem
-              ? "bg-gray-300 dark:bg-gray-700 text-foreground rounded-2xl rounded-bl-sm"
-              : "bg-gray-100 dark:bg-gray-800 text-foreground rounded-2xl rounded-bl-sm",
-          !isUser && "prose prose-sm dark:prose-invert max-w-none"
+          "max-w-[80%] px-4 py-3 rounded-2xl transition-all shadow-md",
+          message.role === "user"
+            ? "bg-gray-900 text-white rounded-br-none shadow-[0_0_8px_rgba(59,130,246,0.5)] border border-blue-500/30"
+            : "bg-gray-900 text-gray-100 rounded-bl-none shadow-[0_0_8px_rgba(124,58,237,0.3)] border border-purple-500/20"
         )}
       >
-        {isUser ? (
-          paragraphs.map((paragraph, index) => (
-            <p
-              key={index}
-              className={paragraph.trim() === "" ? "h-4" : "mb-1 text-sm sm:text-base"}
-            >
-              {paragraph}
-            </p>
-          ))
-        ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <Markdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                pre({ node, className, children, ...props }) {
-                  return (
-                    <pre className="bg-gray-800 text-gray-100 rounded-md p-4 overflow-x-auto my-2 text-sm border border-gray-700" {...props}>
-                      {children}
-                    </pre>
-                  );
-                },
-                code({ node, className, children, ...props }) {
-                  return (
-                    <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
-                      {children}
-                    </code>
-                  );
-                },
-                img({ node, src, alt, ...props }) {
-                  return (
-                    <a href={src} target="_blank" rel="noopener noreferrer" className="block">
-                      <img 
-                        src={src} 
-                        alt={alt || "Image"} 
-                        className="rounded-md shadow-md max-w-full my-2 border border-gray-200 dark:border-gray-700" 
-                        {...props} 
-                      />
-                    </a>
-                  );
-                },
-                a({ node, children, href, ...props }) {
-                  return (
-                    <a 
-                      href={href} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="text-blue-600 dark:text-blue-400 hover:underline" 
-                      {...props}
-                    >
-                      {children}
-                    </a>
-                  );
-                },
-                table({ node, children, ...props }) {
-                  return (
-                    <div className="overflow-x-auto my-4 rounded-md border border-gray-200 dark:border-gray-700">
-                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700" {...props}>
-                        {children}
-                      </table>
-                    </div>
-                  );
-                },
-                th({ node, children, ...props }) {
-                  return (
-                    <th className="px-4 py-3 bg-gray-100 dark:bg-gray-800 text-left text-xs font-medium uppercase tracking-wider" {...props}>
-                      {children}
-                    </th>
-                  );
-                },
-                td({ node, children, ...props }) {
-                  return (
-                    <td className="px-4 py-2 whitespace-nowrap text-sm" {...props}>
-                      {children}
-                    </td>
-                  );
-                }
-              }}
-            >
-              {content}
-            </Markdown>
-          </div>
-        )}
-        <div className="flex justify-end mt-1">
-          <span className={cn(
-            "text-xs",
-            isUser ? "text-blue-100" : "text-gray-500 dark:text-gray-400"
-          )}>
-            {new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-          </span>
+        <div className="prose prose-invert max-w-none">
+          <Markdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              pre(props: MarkdownPreProps) {
+                const { children, ...rest } = props;
+                return (
+                  <pre className="bg-black rounded-lg p-3 overflow-x-auto my-2 border border-gray-800" {...rest}>
+                    {children}
+                  </pre>
+                );
+              },
+              code(props: MarkdownCodeProps) {
+                const { children, ...rest } = props;
+                return (
+                  <code className="bg-black px-1.5 py-0.5 rounded text-sm border border-gray-800" {...rest}>
+                    {children}
+                  </code>
+                );
+              },
+              p(props: MarkdownParagraphProps) {
+                const { children, ...rest } = props;
+                return (
+                  <p className="text-sm leading-relaxed mb-2 last:mb-0" {...rest}>
+                    {children}
+                  </p>
+                );
+              }
+            }}
+          >
+            {message.content}
+          </Markdown>
+        </div>
+        <div className="text-xs mt-2 opacity-70">
+          {message.timestamp.toLocaleTimeString(undefined, { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+          })}
         </div>
       </div>
     </div>
   );
 };
-
-export default ChatMessage;
