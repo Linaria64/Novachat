@@ -279,45 +279,59 @@ body {
 
 /* ========== ANIMATIONS ========== */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideInFromBottom {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  0% { transform: translateY(20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 
 @keyframes slideInFromRight {
-  from { transform: translateX(20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  0% { transform: translateX(20px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes slideInFromLeft {
-  from { transform: translateX(-20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  0% { transform: translateX(-20px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
 
 @keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-5px); }
-  100% { transform: translateY(0px); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
 
 @keyframes pulse-subtle {
-  0% { opacity: 0.85; }
+  0%, 100% { opacity: 0.7; }
   50% { opacity: 1; }
-  100% { opacity: 0.85; }
 }
 
 @keyframes typing-bounce {
-  0%, 80%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-6px); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
 }
 
 @keyframes shimmer {
@@ -325,61 +339,109 @@ body {
   100% { background-position: 200% 0; }
 }
 
-.animate-typing-bounce1 {
-  animation: typing-bounce 1.4s ease-in-out infinite;
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+  50% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.8); }
 }
 
-.animate-typing-bounce2 {
-  animation: typing-bounce 1.4s ease-in-out infinite;
-  animation-delay: 0.2s;
+@keyframes border-pulse {
+  0%, 100% { border-color: rgba(59, 130, 246, 0.3); }
+  50% { border-color: rgba(59, 130, 246, 0.7); }
 }
 
-.animate-typing-bounce3 {
-  animation: typing-bounce 1.4s ease-in-out infinite;
-  animation-delay: 0.4s;
+@keyframes scale-bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
-.animate-fadeIn {
-  animation: fadeIn 0.6s ease forwards;
+@keyframes rotate-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-.animate-slideInFromBottom {
-  animation: slideInFromBottom 0.5s ease forwards;
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out forwards;
 }
 
-.animate-slideInFromRight {
-  animation: slideInFromRight 0.4s ease forwards;
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
 }
 
-.animate-slideInFromLeft {
-  animation: slideInFromLeft 0.4s ease forwards;
+.animate-slide-in-bottom {
+  animation: slideInFromBottom 0.3s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInFromRight 0.3s ease-out forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInFromLeft 0.3s ease-out forwards;
+}
+
+.animate-bounce {
+  animation: bounce 1s ease-in-out infinite;
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 2s ease-in-out infinite;
 }
 
 .animate-float {
   animation: float 3s ease-in-out infinite;
 }
 
-.animate-pulse-subtle {
+.animate-pulse {
   animation: pulse-subtle 2s ease-in-out infinite;
 }
 
 .animate-shimmer {
-  animation: shimmer 2.5s infinite linear;
-  background: linear-gradient(90deg, 
-    rgba(255, 255, 255, 0) 0%, 
-    rgba(255, 255, 255, 0.2) 20%, 
-    rgba(255, 255, 255, 0.5) 60%, 
-    rgba(255, 255, 255, 0) 100%);
+  animation: shimmer 3s linear infinite;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.1) 8%,
+    rgba(255, 255, 255, 0.2) 18%,
+    rgba(255, 255, 255, 0.1) 33%
+  );
   background-size: 200% 100%;
 }
 
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+.animate-border-pulse {
+  animation: border-pulse 2s ease-in-out infinite;
+}
+
+.animate-scale-bounce {
+  animation: scale-bounce 2s ease-in-out infinite;
+}
+
+.animate-rotate-slow {
+  animation: rotate-slow 8s linear infinite;
+}
+
 .dark .animate-shimmer {
-  background: linear-gradient(90deg, 
-    rgba(255, 255, 255, 0) 0%, 
-    rgba(255, 255, 255, 0.1) 20%, 
-    rgba(255, 255, 255, 0.2) 60%, 
-    rgba(255, 255, 255, 0) 100%);
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.1) 8%,
+    rgba(100, 100, 100, 0.2) 18%,
+    rgba(0, 0, 0, 0.1) 33%
+  );
   background-size: 200% 100%;
+}
+
+.animate-typing-bounce1 {
+  animation: typing-bounce 0.6s 0.1s infinite;
+}
+
+.animate-typing-bounce2 {
+  animation: typing-bounce 0.6s 0.2s infinite;
+}
+
+.animate-typing-bounce3 {
+  animation: typing-bounce 0.6s 0.3s infinite;
 }
 
 /* ========== SCROLLBAR STYLING ========== */
@@ -777,18 +839,6 @@ body {
 
 .chat-input textarea:focus {
   outline: none;
-}
-
-/* Message animations */
-@keyframes messagePopIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.8) translateY(10px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
 }
 
 /* Mobile optimizations */
