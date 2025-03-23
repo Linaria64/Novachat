@@ -32,7 +32,7 @@ This application allows you to interact with cutting-edge AI models directly fro
 
 - **Responsive Interface**: Automatically adapts to desktop and mobile screens
 - **Dark Theme**: Optimized for comfortable use day and night
-- **Developer Mode**: Advanced features for technical users
+- **Developer Mode**: Advanced features for technical users ( Only for desktop ) 
 - **Data Confidentiality**: Runs locally on your machine thanks to Ollama, ensuring that your data remains confidential.
 - **Keyboard Shortcuts**: Quick and efficient navigation with shortcuts
 
