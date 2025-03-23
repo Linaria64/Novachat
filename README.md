@@ -1,73 +1,108 @@
-# Chatopia - Local LLM Chat Interface
+# Novachat v1 🤖
 
-Chatopia is a modern web interface for interacting with locally hosted Large Language Models (LLMs) through Ollama.
+<div align="center">
+  <a href="README.md">
+    <img src="https://img.shields.io/badge/English-🇬🇧-blue?style=for-the-badge" alt="English" />
+  </a>
+  <a href="README.fr.md">
+    <img src="https://img.shields.io/badge/Français-🇫🇷-blue?style=for-the-badge" alt="Français" />
+  </a>
+</div>
 
-## Features
+![Novachat](public/og-image.png)
 
-- 🚀 **Modern UI/UX**: Clean, responsive interface with dark mode support
-- 🔄 **Real-time streaming**: See responses as they're generated
-- 💾 **Local storage**: Conversations are saved locally in your browser
-- 🎨 **Code highlighting**: Proper formatting for code blocks
-- 🌐 **Configurable API**: Connect to any Ollama API endpoint
-- 🔌 **Connection management**: Automatic reconnection and status monitoring
-- 📱 **Responsive design**: Works on desktop and mobile devices
+## 🚀 Introduction
 
-## Getting Started
+**Novachat** is an elegant and powerful interface for conversing with advanced language models. Version 1.0 is now available, offering a smooth and intuitive user experience.
 
-### Prerequisites
+This application allows you to interact with cutting-edge AI models directly from your web browser, with a responsive interface optimized for both mobile and desktop.
 
-1. Install [Ollama](https://ollama.ai/download) on your machine
-2. Pull a model using Ollama (e.g., `ollama pull llama2`)
+<div align="center">
+  <h3>Try Ollama for local models</h3>
+  <a href="https://ollama.com" target="_blank">
+    <img src="https://img.shields.io/badge/Download-Ollama-5A67D8?style=for-the-badge&logo=docker&logoColor=white" alt="Download Ollama" />
+  </a>
+</div>
 
-### Running the Application
+## ✨ Features
 
-1. Clone this repository
-2. Install dependencies:
-   ```
-   npm install
-   ```
-3. Start the development server:
-   ```
-   npm run dev
-   ```
-4. Open your browser and navigate to `http://localhost:5173`
+- **Responsive Interface**: Automatically adapts to desktop and mobile screens
+- **Dark Theme**: Optimized for comfortable use day and night
+- **Developer Mode**: Advanced features for technical users
+- **PWA Features**: Install on your device for offline use
+- **Voice Recognition**: Dictate your messages instead of typing
+- **Keyboard Shortcuts**: Quick and efficient navigation with shortcuts
 
-### Building for Production
+## 🔌 API Connection
 
-```
+### Groq API (Default)
+
+Novachat automatically connects to **Groq API** at startup, providing access to powerful models:
+
+- **Llama 3 (70B)** - Main model for general conversations
+- **Qwen QWQ (32B)** - Reasoning model for complex questions
+
+The application intelligently switches between these two models depending on the nature of your questions.
+
+### Ollama (Developer Mode)
+
+For users wanting to run models locally, Novachat supports **Ollama**.
+
+1. [Download and install Ollama](https://ollama.com)
+2. Run Ollama on your machine
+3. Activate developer mode in Novachat
+4. Select Ollama as the service
+
+## 🔍 Usage Modes
+
+### Standard Conversation Mode
+
+Ideal for general discussions, question answering, and assistance on various topics.
+
+### Reasoning Mode
+
+Optimized for complex questions requiring in-depth analysis and step-by-step reasoning.
+
+## 💻 Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/your-username/novachat.git
+
+# Navigate to the directory
+cd novachat
+
+# Install dependencies
+npm install
+
+# Run in development mode
+npm run dev
+
+# Build for production
 npm run build
 ```
 
-The built files will be in the `dist` directory and can be served by any static file server.
 
-## Connecting to Ollama
 
-By default, Chatopia connects to Ollama at `http://localhost:11434/api`. If you're running Ollama on a different machine or port, you can configure the connection in the settings:
+## 📱 Mobile Interface
 
-1. Click the ⚙️ (Settings) icon in the top right corner
-2. Enter the API URL of your Ollama instance
-3. Click "Test Connection" to verify
-4. Save your changes
+On mobile, Novachat offers an optimized experience:
 
-## Usage
+- Forced dark theme for better visual comfort
+- Simplified interface without navigation bar
+- "New conversation" button integrated directly into the input area
 
-1. Select a model from the dropdown menu
-2. Type your message in the input field
-3. Press Enter or click Send
-4. View the AI's response
-5. Continue the conversation
+## 🤝 Contribution
 
-## Keyboard Shortcuts
+Contributions are welcome! Feel free to open an issue or submit a pull request.
 
-- `Ctrl+Enter` or `Cmd+Enter`: Send message
-- `Esc`: Close dialogs
+## 📝 License
 
-## Troubleshooting
+This project is licensed under the MIT License.
 
-- **Can't connect to Ollama**: Make sure Ollama is running and accessible at the configured URL
-- **No models available**: Make sure you've pulled at least one model using Ollama
-- **Slow responses**: Large models may take longer to respond, especially on less powerful hardware
+---
 
-## License
-
-MIT
+<div align="center">
+  <p>Built with ❤️ using React, TypeScript and Tailwind CSS</p>
+  <p>© 2025 Novachat</p>
+</div>
