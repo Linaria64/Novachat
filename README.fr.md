@@ -32,10 +32,9 @@ Cette application vous permet de dialoguer avec des modèles d'IA de pointe, dir
 
 - **Interface Responsive**: Adaptée automatiquement aux écrans de bureau et mobiles
 - **Thème Sombre**: Optimisé pour une utilisation confortable de jour comme de nuit
-- **Mode Développeur**: Fonctionnalités avancées pour les utilisateurs techniques
-- **Fonctionnalités PWA**: Installation sur votre appareil pour une utilisation hors ligne
-- **Reconnaissance Vocale**: Dictez vos messages au lieu de les taper
+- **Mode Développeur**: Fonctionnalités avancées pour les utilisateurs techniques ( uniquement sur pc )
 - **Raccourcis Clavier**: Navigation rapide et efficace avec des raccourcis
+- **Confidentialité des Données** : Tourne en local sur votre machine grâce a Ollama 
 
 ## 🔌 Connexion API
 
@@ -93,11 +92,7 @@ Sur mobile, Novachat offre une expérience optimisée :
 - Thème sombre forcé pour un meilleur confort visuel
 - Interface simplifiée sans barre de navigation
 - Bouton "Nouvelle conversation" intégré directement dans la zone de saisie
-- Reconnaissance vocale pour la dictée de messages
 
-## 🤝 Contribution
-
-Les contributions sont bienvenues ! N'hésitez pas à ouvrir une issue ou soumettre une pull request.
 
 ## 📝 Licence
 
