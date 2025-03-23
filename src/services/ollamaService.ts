@@ -1,9 +1,7 @@
 import { toast } from "sonner";
 import { BaseMessage, MessageRole, OllamaModel } from "@/types/chat";
 
-const DEFAULT_API_URL = "http://localhost:11434/api";
-const API_TIMEOUT = 10000;
-
+// Types
 export type OllamaMessage = BaseMessage;
 export type { OllamaModel };
 
@@ -11,249 +9,200 @@ export interface OllamaResponse {
   model: string;
   created_at: string;
   message: {
-    role: MessageRole;
+    role: string;
     content: string;
   };
   done: boolean;
+  total_duration: number;
+  load_duration: number;
+  prompt_eval_count: number;
+  prompt_eval_duration: number;
+  eval_count: number;
+  eval_duration: number;
 }
 
-// Configuration
-const SETTINGS_KEY = "chatopia-settings";
+// Constants
+const OLLAMA_API_URL = "http://localhost:11434/api/chat";
+const CONNECTION_TIMEOUT = 10000; // 10 seconds
+const RETRY_COUNT = 2;
+const RETRY_DELAY = 1000; // 1 second
 
-// Determine if we're in development or production
-const isDevelopment = import.meta.env.DEV;
+// Available models - will be updated dynamically
+export let AVAILABLE_MODELS: OllamaModel[] = [
+  { id: "llama3", name: "Llama 3" },
+  { id: "mistral", name: "Mistral" },
+  { id: "gemma", name: "Gemma" },
+  { id: "codellama", name: "Code Llama" },
+  { id: "phi3", name: "Phi-3" }
+];
 
-// Determine the base URL based on environment
-export function getBaseUrl(url: string): string {
-  // If it's already a relative URL (starts with /), it will use the proxy
-  if (url.startsWith('/')) {
-    return url;
-  }
-  
-  // If in production, always use the proxy URL
-  if (isDevelopment) {
-    return url;
-  }
-  
-  // In production, always use the proxy URL
-  return '/ollama-api/api';
-}
+/**
+ * Sleep function for retry mechanism
+ * @param {number} ms - Milliseconds to sleep
+ * @returns {Promise<void>}
+ */
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
-// Settings type
-export interface OllamaSettings {
-  apiUrl: string;
-  timeout: number;
-}
-
-// Default settings
-export const defaultSettings: OllamaSettings = {
-  apiUrl: DEFAULT_API_URL,
-  timeout: API_TIMEOUT,
-};
-
-// Get current settings
-export function getSettings(): OllamaSettings {
+/**
+ * Get available models from Ollama
+ * @returns {Promise<OllamaModel[]>} List of available models
+ */
+export async function fetchOllamaModels(): Promise<OllamaModel[]> {
   try {
-    const savedSettings = localStorage.getItem(SETTINGS_KEY);
-    if (savedSettings) {
-      return JSON.parse(savedSettings);
+    const response = await fetch("http://localhost:11434/api/tags", {
+      method: "GET"
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data && data.models) {
+      // Format models
+      const models = data.models.map((model: any) => ({
+        id: model.name,
+        name: model.name.charAt(0).toUpperCase() + model.name.slice(1)
+      }));
+      
+      // Update available models
+      AVAILABLE_MODELS = models;
+      return models;
+    }
+    
+    return AVAILABLE_MODELS;
+  } catch (error) {
+    console.error("Error fetching Ollama models:", error);
+    return AVAILABLE_MODELS; // Return default models on error
+  }
+}
+
+/**
+ * Check connection to Ollama API
+ * @returns {Promise<boolean>} Whether connection is successful
+ */
+export async function checkConnection(): Promise<boolean> {
+  try {
+    console.log("Checking connection to Ollama API...");
+    
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT);
+    
+    try {
+      const response = await fetch("http://localhost:11434/api/tags", {
+        method: "GET",
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+  
+      if (!response.ok) {
+        console.error("Ollama API error:", response.statusText);
+        return false;
+      }
+      
+      // Fetch available models
+      await fetchOllamaModels();
+      
+      console.log("Successfully connected to Ollama API");
+      return true;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      const fetchError = error as Error;
+      
+      if (fetchError.name === 'AbortError') {
+        console.error("Connection to Ollama API timed out");
+      } else {
+        console.error("Fetch error:", fetchError);
+      }
+      return false;
     }
   } catch (error) {
-    console.error("Error parsing settings:", error);
-  }
-  return defaultSettings;
-}
-
-// Save settings
-export function saveSettings(settings: OllamaSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-}
-
-// Get current API URL
-export function getApiUrl(): string {
-  return getBaseUrl(getSettings().apiUrl);
-}
-
-// Get original API URL (for display)
-export function getDisplayApiUrl(): string {
-  return getSettings().apiUrl;
-}
-
-// Get current timeout
-export function getTimeout(): number {
-  return getSettings().timeout;
-}
-
-// Connection state
-let connectionStatus = {
-  isConnected: false,
-  lastChecked: 0,
-  reconnectAttempts: 0,
-};
-
-// Cache for models
-let modelsCache: {
-  data: OllamaModel[];
-  timestamp: number;
-} = {
-  data: [],
-  timestamp: 0,
-};
-
-// Helper for fetch with timeout
-const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = getTimeout()) => {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(id);
-    return response;
-  } catch (error) {
-    clearTimeout(id);
-    throw error;
-  }
-};
-
-// Check connection status
-export async function checkConnection(): Promise<boolean> {
-  // Use cached status if checked recently (within 5 seconds)
-  const now = Date.now();
-  if (now - connectionStatus.lastChecked < 5000) {
-    return connectionStatus.isConnected;
-  }
-  
-  try {
-    const response = await fetchWithTimeout(`${getApiUrl()}/tags`, {}, 5000);
-    connectionStatus.isConnected = response.ok;
-    connectionStatus.lastChecked = now;
-    connectionStatus.reconnectAttempts = 0;
-    return response.ok;
-  } catch (error) {
-    connectionStatus.isConnected = false;
-    connectionStatus.lastChecked = now;
-    connectionStatus.reconnectAttempts++;
-    console.error("Connection check failed:", error);
+    console.error("Error checking connection to Ollama API:", error);
+    const generalError = error as Error;
     return false;
   }
 }
 
-export async function getModels(): Promise<OllamaModel[]> {
-  // Use cache if available and less than 1 minute old
-  const now = Date.now();
-  if (modelsCache.data.length > 0 && now - modelsCache.timestamp < 60000) {
-    return modelsCache.data;
+/**
+ * Generate a completion using Ollama API with retry mechanism
+ * @param {string} model - The model ID to use
+ * @param {Array} messages - The conversation messages
+ * @param {AbortSignal} signal - Optional AbortSignal for cancellation
+ * @returns {Promise<string>} The generated completion
+ */
+export const generateOllamaCompletion = async (
+  model: string,
+  messages: { role: string; content: string; }[],
+  signal?: AbortSignal
+): Promise<string> => {
+  let retries = 0;
+  
+  while (retries <= RETRY_COUNT) {
+    try {
+      console.log(`Generating completion with Ollama... (Attempt ${retries + 1}/${RETRY_COUNT + 1})`);
+      
+      const response = await fetch(OLLAMA_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          stream: false,
+          options: {
+            temperature: 0.7,
+            top_p: 0.95
+          }
+        }),
+        signal
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("Ollama API error:", error);
+        
+        // Check for rate limiting or server errors that might be temporary
+        if (response.status === 429 || response.status >= 500) {
+          if (retries < RETRY_COUNT) {
+            retries++;
+            const delay = RETRY_DELAY * retries;
+            console.log(`Retrying in ${delay}ms...`);
+            await sleep(delay);
+            continue;
+          }
+        }
+        
+        throw new Error(error || response.statusText);
+      }
+
+      const data = await response.json();
+      return data.message?.content || "Désolé, je n'ai pas pu générer de réponse.";
+    } catch (error) {
+      const typedError = error as Error;
+      
+      // Don't retry if it's an abort error
+      if (typedError.name === 'AbortError') {
+        console.log("Request aborted by user");
+        throw error;
+      }
+      
+      // Don't retry if we've hit the maximum retries
+      if (retries >= RETRY_COUNT) {
+        console.error("Maximum retries reached. Error:", typedError);
+        throw error;
+      }
+      
+      // Retry for network errors
+      retries++;
+      const delay = RETRY_DELAY * retries;
+      console.log(`Network error, retrying in ${delay}ms...`, typedError);
+      await sleep(delay);
+    }
   }
   
-  try {
-    const response = await fetchWithTimeout(`${getApiUrl()}/tags`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch models: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    const models = data.models || [];
-    
-    // Update cache
-    modelsCache = {
-      data: models,
-      timestamp: now,
-    };
-    
-    return models;
-  } catch (error) {
-    console.error("Error fetching models:", error);
-    throw error;
-  }
-}
-
-export async function generateCompletion(
-  model: string,
-  messages: OllamaMessage[]
-): Promise<string> {
-  try {
-    const response = await fetchWithTimeout(`${getApiUrl()}/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Ollama API error: ${errorText}`);
-    }
-
-    const data = await response.json();
-    return data.message.content;
-  } catch (error) {
-    console.error("Error generating completion:", error);
-    toast.error("Failed to connect to Ollama. Is it running locally?");
-    throw error;
-  }
-}
-
-// New streaming API for better UX
-export async function generateCompletionStream(
-  model: string,
-  messages: BaseMessage[],
-  onChunk: (chunk: string) => void,
-  onComplete: () => void,
-  onError: (error: Error) => void
-): Promise<void> {
-  try {
-    const response = await fetchWithTimeout(`${getApiUrl()}/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to generate completion");
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error("Failed to get response reader");
-    }
-
-    const decoder = new TextDecoder();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value);
-      const lines = chunk.split("\n").filter(Boolean);
-
-      for (const line of lines) {
-        try {
-          const data = JSON.parse(line);
-          if (data.message?.content) {
-            onChunk(data.message.content);
-          }
-        } catch (e) {
-          console.error("Error parsing chunk:", e);
-        }
-      }
-    }
-
-    onComplete();
-  } catch (error) {
-    onError(error instanceof Error ? error : new Error("Unknown error"));
-  }
-}
+  // This should never happen, but TypeScript requires a return statement
+  throw new Error("Failed to generate completion after retries");
+};

@@ -108,7 +108,6 @@ export async function checkConnection(): Promise<boolean> {
       if (!response.ok) {
         const error = await response.json();
         console.error("Groq API error:", error);
-        toast.error(`Erreur API Groq: ${error.error?.message || response.statusText}`);
         return false;
       }
       
@@ -120,17 +119,14 @@ export async function checkConnection(): Promise<boolean> {
       
       if (fetchError.name === 'AbortError') {
         console.error("Connection to Groq API timed out");
-        toast.error("La connexion à l'API Groq a expiré. Veuillez réessayer plus tard.");
       } else {
         console.error("Fetch error:", fetchError);
-        toast.error(`Erreur de connexion: ${fetchError.message || 'Erreur inconnue'}`);
       }
       return false;
     }
   } catch (error) {
     console.error("Error checking connection to Groq API:", error);
     const generalError = error as Error;
-    toast.error(`Échec de la connexion à l'API Groq: ${generalError.message || 'Erreur inconnue'}`);
     return false;
   }
 }
@@ -155,7 +151,6 @@ export const generateGroqCompletion = async (
       const apiKey = getApiKey();
       
       if (!apiKey) {
-        toast.error("Aucune clé API Groq trouvée. Veuillez la définir dans les paramètres.");
         throw new Error("Aucune clé API trouvée");
       }
       
@@ -192,7 +187,6 @@ export const generateGroqCompletion = async (
           }
         }
         
-        toast.error(`Erreur API Groq: ${error.error?.message || response.statusText}`);
         throw new Error(error.error?.message || response.statusText);
       }
 
@@ -210,7 +204,6 @@ export const generateGroqCompletion = async (
       // Don't retry if we've hit the maximum retries
       if (retries >= RETRY_COUNT) {
         console.error("Maximum retries reached. Error:", typedError);
-        toast.error(`Échec de la génération de la réponse: ${typedError.message || 'Erreur inconnue'}`);
         throw error;
       }
       

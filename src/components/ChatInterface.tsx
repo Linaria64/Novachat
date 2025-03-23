@@ -1,18 +1,21 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, X, Bot, Brain, Trash, ChevronDown, MessageSquare } from "lucide-react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
+import { Send, X, Bot, Brain, Trash, ChevronDown, MessageSquare, Sparkles } from "lucide-react";
 import { generateGroqCompletion, checkConnection, AVAILABLE_MODELS } from "@/services/groqService";
+import { generateOllamaCompletion, AVAILABLE_MODELS as OLLAMA_MODELS } from "@/services/ollamaService";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChatMessage } from "@/components/ChatMessage";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Constants
 const MESSAGE_HISTORY_LIMIT = 10;
 const TEXTAREA_MAX_HEIGHT_MOBILE = 150;
 const TEXTAREA_MAX_HEIGHT_DESKTOP = 200;
 const AUTO_SCROLL_DELAY = 100;
+const MOBILE_BREAKPOINT = 768;
 
 // Message roles
 const MessageRole = {
@@ -26,18 +29,291 @@ interface ChatInterfaceProps {
   className?: string;
 }
 
+// Welcome screen component
+const WelcomeScreen = memo(({ 
+  selectedMode, 
+  handleModeChange 
+}: { 
+  selectedMode: "normal" | "reasoning";
+  handleModeChange: (mode: "normal" | "reasoning") => void;
+}) => {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] sm:min-h-[50vh] text-center p-4 sm:p-6 space-y-4 sm:space-y-6 animate-[fadeIn_0.5s_ease_forwards,slideUp_0.5s_ease_forwards]">
+      <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/20 mb-2 sm:mb-4">
+        <Bot className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+      </div>
+      
+      <h2 className="text-2xl sm:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+        Bienvenue sur Novachat
+      </h2>
+      
+      <p className="text-gray-300 max-w-md mx-auto text-sm sm:text-base leading-relaxed px-2">
+        {selectedMode === "normal" 
+          ? "Posez une question ou démarrez une conversation avec notre assistant IA."
+          : "Mode Raisonnement activé. Posez une question complexe pour obtenir un raisonnement étape par étape."
+        }
+      </p>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 w-full max-w-md mt-2 sm:mt-4 px-4 sm:px-0">
+        <div 
+          className={cn(
+            "p-3 sm:p-4 rounded-xl border transition-all cursor-pointer", 
+            selectedMode === "normal" 
+              ? "bg-blue-500/10 border-blue-500/40 shadow-md shadow-blue-500/5" 
+              : "bg-gray-800/30 border-gray-700/30 hover:bg-gray-800/50"
+          )}
+          onClick={() => handleModeChange("normal")}
+        >
+          <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400 mb-1.5 sm:mb-2" />
+          <h3 className="font-medium text-white text-sm sm:text-base">Mode Normal</h3>
+          <p className="text-xs sm:text-sm text-gray-400">Réponses concises et directes</p>
+        </div>
+        
+        <div 
+          className={cn(
+            "p-3 sm:p-4 rounded-xl border transition-all cursor-pointer", 
+            selectedMode === "reasoning" 
+              ? "bg-purple-500/10 border-purple-500/40 shadow-md shadow-purple-500/5" 
+              : "bg-gray-800/30 border-gray-700/30 hover:bg-gray-800/50"
+          )}
+          onClick={() => handleModeChange("reasoning")}
+        >
+          <Brain className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400 mb-1.5 sm:mb-2" />
+          <h3 className="font-medium text-white text-sm sm:text-base">Mode Raisonnement</h3>
+          <p className="text-xs sm:text-sm text-gray-400">Réponses détaillées et explicatives</p>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// Input bar component
+const InputBar = memo(({
+  input,
+  handleTyping,
+  handleKeyDown,
+  handleSend,
+  isLoadingComplete,
+  isGenerating,
+  abortFunction,
+  selectedMode,
+  handleModeChange,
+  messages,
+  clearMessages,
+  isMobile,
+  inputRef,
+  isConnected,
+  selectedModel
+}: {
+  input: string;
+  handleTyping: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  handleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  handleSend: () => Promise<void>;
+  isLoadingComplete: boolean;
+  isGenerating: boolean;
+  abortFunction: () => void;
+  selectedMode: "normal" | "reasoning";
+  handleModeChange: (mode: "normal" | "reasoning") => void;
+  messages: Message[];
+  clearMessages: () => void;
+  isMobile: boolean;
+  inputRef: React.RefObject<HTMLTextAreaElement>;
+  isConnected: boolean;
+  selectedModel: string;
+}) => {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-20">
+      {/* Connection status indicator */}
+      <div className="flex justify-center mb-1">
+        <div className="bg-gray-900/70 backdrop-blur-sm rounded-full py-1 px-3 text-xs flex items-center gap-1.5 border border-gray-700/30">
+          <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}></div>
+          <span className="text-gray-300">
+            {isConnected 
+              ? (window as any).isDeveloperMode 
+                ? (window as any).selectedService === "ollama" && (window as any).isConnectedToOllama 
+                  ? `Connecté à Ollama (${(window as any).selectedOllamaModel || "llama3"})`
+                  : `Connecté à Groq (${(window as any).selectedGroqModel || "llama3-70b-8192"})`
+                : "Connecté"
+              : "Déconnecté"}
+          </span>
+        </div>
+      </div>
+      
+      <div className={cn(
+        "border-t border-gray-800/40 backdrop-blur-md w-full py-2 sm:py-3 px-2 sm:px-4",
+        "bg-gradient-to-t from-gray-900 to-gray-900/95"
+      )}>
+        <div className="max-w-4xl mx-auto relative">
+          <div className="flex items-end gap-1.5 sm:gap-2 rounded-xl border border-gray-700/50 bg-gray-800/50 backdrop-blur-md p-1.5 sm:p-2 shadow-lg">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn(
+                      "rounded-lg w-8 h-8 sm:w-10 sm:h-10 transition-all duration-200 hidden md:flex",
+                      selectedMode === "normal" 
+                        ? "text-blue-400 hover:bg-blue-500/10" 
+                        : "text-purple-400 hover:bg-purple-500/10"
+                    )}
+                    onClick={() => handleModeChange(selectedMode === "normal" ? "reasoning" : "normal")}
+                  >
+                    {selectedMode === "normal" ? (
+                      <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
+                    ) : (
+                      <Brain className="w-4 h-4 sm:w-5 sm:h-5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs sm:text-sm">Mode {selectedMode === "normal" ? "Normal" : "Raisonnement"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <div className="relative flex-1">
+              <Textarea
+                ref={inputRef}
+                value={input}
+                onChange={handleTyping}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  selectedMode === "normal"
+                    ? "Posez votre question..."
+                    : "Posez une question complexe pour obtenir un raisonnement détaillé..."
+                }
+                className="min-h-[40px] sm:min-h-[50px] max-h-[120px] sm:max-h-[200px] bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none placeholder:text-gray-500 text-sm sm:text-base py-1.5 px-2 sm:py-2 sm:px-3"
+                disabled={!isLoadingComplete || isGenerating}
+              />
+              
+              {selectedMode === "reasoning" && (
+                <div className="absolute left-2 sm:left-3 bottom-1 flex items-center text-[10px] sm:text-xs text-purple-400 pointer-events-none gap-0.5 sm:gap-1">
+                  <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                  <span>Mode Raisonnement</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 sm:gap-2">
+              {isGenerating ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={abortFunction}
+                        className="rounded-lg w-8 h-8 sm:w-10 sm:h-10 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                        disabled={!isLoadingComplete}
+                      >
+                        <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs sm:text-sm">Arrêter la génération</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <>
+                  {messages.length > 0 && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={clearMessages}
+                            className="rounded-lg w-8 h-8 sm:w-10 sm:h-10 text-gray-400 hover:bg-gray-700/60 hidden md:flex"
+                            disabled={!isLoadingComplete || messages.length === 0}
+                          >
+                            <Trash className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p className="text-xs sm:text-sm">Effacer la conversation</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  
+                  <Button
+                    size="icon"
+                    onClick={handleSend}
+                    className={cn(
+                      "rounded-lg w-8 h-8 sm:w-10 sm:h-10 transition-all",
+                      selectedMode === "reasoning" 
+                        ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/20 hover:shadow-purple-500/30"
+                        : "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md shadow-blue-500/20 hover:shadow-blue-500/30"
+                    )}
+                    disabled={!isLoadingComplete || isGenerating || !input.trim()}
+                  >
+                    <Send className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile mode toggles */}
+          {isMobile && (
+            <div className="flex justify-center gap-1.5 sm:gap-2 mt-2 sm:mt-3">
+              <button
+                className={cn(
+                  "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs transition-all",
+                  selectedMode === "normal"
+                    ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                    : "bg-gray-800/40 text-gray-400 border border-gray-700/30"
+                )}
+                onClick={() => handleModeChange("normal")}
+              >
+                <MessageSquare className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                <span>Normal</span>
+              </button>
+              
+              <button
+                className={cn(
+                  "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs transition-all",
+                  selectedMode === "reasoning"
+                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                    : "bg-gray-800/40 text-gray-400 border border-gray-700/30"
+                )}
+                onClick={() => handleModeChange("reasoning")}
+              >
+                <Brain className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                <span>Raisonnement</span>
+              </button>
+              
+              {messages.length > 0 && (
+                <button
+                  className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs transition-all bg-gray-800/40 text-gray-400 border border-gray-700/30"
+                  onClick={clearMessages}
+                >
+                  <Trash className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                  <span>Effacer</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 // Main component
 const ChatInterface = ({ className }: ChatInterfaceProps) => {
   // Chat state
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<"normal" | "reasoning">("normal");
-  const [selectedModel] = useState<string>("llama3-70b-8192");
-  const [_isConnected, setIsConnected] = useState<boolean>(false);
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isLoadingComplete, setIsLoadingComplete] = useState<boolean>(false);
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
-  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < MOBILE_BREAKPOINT);
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -45,22 +321,31 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   
-  // Check API connection
-  const fetchModels = useCallback(async () => {
-    try {
-      const isConnected = await checkConnection();
-      setIsConnected(isConnected);
+  // Effects for global state synchronization
+  useEffect(() => {
+    // Update from global state
+    const updateFromGlobalState = () => {
+      const isDev = (window as any).isDeveloperMode || false;
+      const selectedService = (window as any).selectedService || "groq";
       
-      if (isConnected) {
-        toast.success("Connecté à l'API Groq");
+      if (selectedService === "groq") {
+        // If using Groq
+        setSelectedModel((window as any).selectedGroqModel || "llama3-70b-8192");
+        setIsConnected((window as any).isConnectedToGroq || false);
       } else {
-        toast.error("Impossible de se connecter à l'API Groq");
+        // If using Ollama
+        setSelectedModel((window as any).selectedOllamaModel || "llama3");
+        setIsConnected(isDev && (window as any).isConnectedToOllama || false);
       }
-    } catch (error) {
-      console.error("Error checking API connection:", error);
-      setIsConnected(false);
-      toast.error("Impossible de récupérer les modèles. Veuillez vérifier votre connexion.");
-    }
+    };
+    
+    // Run once initially
+    updateFromGlobalState();
+    
+    // Setup interval to check for changes
+    const intervalId = setInterval(updateFromGlobalState, 1000);
+    
+    return () => clearInterval(intervalId);
   }, []);
   
   // Scroll to bottom function
@@ -74,13 +359,22 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
       setIsGenerating(false);
-      toast.info("Génération arrêtée");
     }
   }, []);
   
   // Send message handler
   const handleSend = useCallback(async () => {
     if (!input.trim() || isGenerating) return;
+    
+    // Check connection
+    const selectedService = (window as any).selectedService || "groq";
+    const isServiceConnected = selectedService === "groq" 
+      ? (window as any).isConnectedToGroq 
+      : (window as any).isConnectedToOllama;
+      
+    if (!isServiceConnected) {
+      return;
+    }
     
     // Add user message
     const userMessage: Message = {
@@ -97,10 +391,13 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
     
-    // Determine model based on selected mode
-    let modelToUse = selectedModel;
+    // Determine model based on selected service and mode
+    let modelToUse = selectedService === "groq" 
+      ? (window as any).selectedGroqModel || "llama3-70b-8192"
+      : (window as any).selectedOllamaModel || "llama3";
     
-    if (selectedMode === "reasoning") {
+    // Override with reasoning model for Groq if in reasoning mode
+    if (selectedService === "groq" && selectedMode === "reasoning") {
       const qwenModel = AVAILABLE_MODELS.find(model => model.id === "qwen-qwq-32b");
       if (qwenModel) {
         modelToUse = qwenModel.id;
@@ -137,12 +434,21 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
         content: input.trim(),
       });
       
-      // Generate completion
-      const response = await generateGroqCompletion(
-        modelToUse,
-        conversationContext,
-        signal
-      );
+      // Generate completion based on selected service
+      let response;
+      if (selectedService === "groq") {
+        response = await generateGroqCompletion(
+          modelToUse,
+          conversationContext,
+          signal
+        );
+      } else {
+        response = await generateOllamaCompletion(
+          modelToUse,
+          conversationContext,
+          signal
+        );
+      }
       
       // Update assistant message with response
       setMessages((prev) =>
@@ -160,9 +466,6 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       }
       
       console.error("Error generating completion:", error);
-      
-      // Show error toast
-      toast.error(`Erreur: ${error.message || "Une erreur est survenue"}`);
       
       // Update assistant message with error
       setMessages((prev) =>
@@ -183,7 +486,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       // Scroll after response
       setTimeout(scrollToBottom, AUTO_SCROLL_DELAY);
     }
-  }, [input, isGenerating, messages, scrollToBottom, selectedMode, selectedModel]);
+  }, [input, isGenerating, messages, scrollToBottom, selectedMode]);
   
   // Input handler
   const handleTyping = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -219,7 +522,6 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   // Mode change handler
   const handleModeChange = useCallback((mode: "normal" | "reasoning") => {
     setSelectedMode(mode);
-    toast.info(`Mode ${mode === "normal" ? "normal" : "raisonnement"} activé`);
   }, []);
   
   // Effects
@@ -232,7 +534,6 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       if (!bodyClass.contains("loading-active")) {
         // Focus input when loaded
         inputRef.current?.focus();
-        fetchModels();
       }
     };
     
@@ -240,7 +541,6 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
     const handleLoadingComplete = () => {
       setIsLoadingComplete(true);
       inputRef.current?.focus();
-      fetchModels();
     };
     
     // Check initial loading state
@@ -253,7 +553,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
     return () => {
       window.removeEventListener("novachat:loading-complete", handleLoadingComplete);
     };
-  }, [fetchModels]);
+  }, []);
   
   // Listen for conversation events
   useEffect(() => {
@@ -266,9 +566,6 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
-      
-      // Show toast
-      toast.success("Nouvelle conversation démarrée");
     };
     
     // Listen for new conversation event
@@ -284,7 +581,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   useEffect(() => {
     // Resize handler
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
     };
     
     // Listen for resize events
@@ -321,155 +618,78 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       }
     };
   }, []);
+
+  // Background gradient elements - memoized to prevent unnecessary rerenders
+  const backgroundGradients = useMemo(() => (
+    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+      <div className="absolute top-0 right-0 w-2/3 h-2/3 bg-gradient-to-br from-blue-600/5 to-purple-600/5 rounded-full filter blur-3xl opacity-40 animate-[pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite]"></div>
+      <div className="absolute bottom-0 left-0 w-2/3 h-2/3 bg-gradient-to-tr from-emerald-600/5 to-blue-600/5 rounded-full filter blur-3xl opacity-40 animate-[pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite] delay-1000"></div>
+    </div>
+  ), []);
+  
+  // Scroll button - memoized to prevent unnecessary rerenders
+  const scrollButton = useMemo(() => {
+    if (!showScrollButton || messages.length === 0) return null;
+    
+    return (
+      <button
+        className="fixed bottom-[90px] sm:bottom-[100px] md:bottom-[120px] right-2 sm:right-4 bg-gray-800/80 backdrop-blur-sm text-white rounded-full w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center shadow-lg transition-all hover:bg-gray-700 border border-white/10 z-50"
+        onClick={scrollToBottom}
+        aria-label="Scroll to bottom"
+      >
+        <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
+      </button>
+    );
+  }, [showScrollButton, messages.length, scrollToBottom]);
   
   return (
-    <div className={cn("flex flex-col h-screen bg-black", className)}>
+    <div className={cn("flex flex-col h-screen bg-gradient-to-b from-black to-gray-900", className)}>
       <div className="flex-1 overflow-hidden relative">
+        {/* Animated background gradients */}
+        {backgroundGradients}
+        
         <div 
           ref={chatContainerRef}
-          className="absolute inset-0 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
-          <div className="max-w-3xl mx-auto px-4 py-6">
+          className="absolute inset-0 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent z-10 p-3 sm:p-4 md:p-6">
+          <div className="max-w-4xl mx-auto">
             {messages.length === 0 ? (
-              <div className="text-center py-8 px-6 rounded-2xl bg-gray-900/50 border border-gray-800 animate-fade-in-up">
-                <Bot className="w-8 h-8 text-gray-400 mx-auto mb-4 animate-pulse" />
-                <p className="text-gray-300 text-sm">
-                  {selectedMode === "normal" 
-                    ? "Posez une question ou démarrez une conversation."
-                    : "Mode Raisonnement activé. Posez une question complexe pour obtenir un raisonnement étape par étape."
-                  }
-                </p>
-              </div>
+              <WelcomeScreen
+                selectedMode={selectedMode}
+                handleModeChange={handleModeChange}
+              />
             ) : (
-              messages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
-              ))
+              <div className="space-y-4 sm:space-y-6 pb-24 sm:pb-28 md:pb-32">
+                {messages.map((message) => (
+                  <ChatMessage key={message.id} message={message} />
+                ))}
+              </div>
             )}
             <div ref={messagesEndRef} />
             
             {/* Scroll to bottom button */}
-            {showScrollButton && messages.length > 0 && (
-              <button
-                className="fixed bottom-[80px] right-4 bg-gray-800 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition-all hover:bg-gray-700 animate-bounce-slow"
-                onClick={scrollToBottom}
-                aria-label="Scroll to bottom"
-              >
-                <ChevronDown className="w-5 h-5" />
-              </button>
-            )}
+            {scrollButton}
           </div>
         </div>
       </div>
 
-      <div className="border-t border-gray-800 bg-black">
-        <div className="max-w-3xl mx-auto p-4">
-          <div className="flex items-end gap-2 bg-gray-900/50 p-4 rounded-2xl border border-gray-800 animate-fade-in">
-            {!isMobile && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className={cn(
-                  "rounded-full w-10 h-10 bg-gray-900 transition-all duration-300",
-                  selectedMode === "normal" 
-                    ? "text-blue-400 hover:shadow-[0_0_5px_rgba(59,130,246,0.5)] hover:border-blue-500/30"
-                    : "text-purple-400 hover:shadow-[0_0_5px_rgba(124,58,237,0.5)] hover:border-purple-500/30"
-                )}
-                onClick={() => handleModeChange(selectedMode === "normal" ? "reasoning" : "normal")}
-              >
-                {selectedMode === "normal" ? (
-                  <MessageSquare className="w-5 h-5 transition-transform hover:scale-110" />
-                ) : (
-                  <Brain className="w-5 h-5 transition-transform hover:scale-110" />
-                )}
-              </Button>
-            )}
-
-            <Textarea
-              ref={inputRef}
-              value={input}
-              onChange={handleTyping}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                selectedMode === "normal"
-                  ? "Posez votre question..."
-                  : "Posez une question complexe pour obtenir un raisonnement détaillé..."
-              }
-              className="min-h-[50px] flex-1 resize-none rounded-xl bg-gray-900 border-gray-800 placeholder-gray-500 text-white focus:ring-0 focus:border-gray-700 transition-all"
-              disabled={!isLoadingComplete || isGenerating}
-            />
-
-            <div className="flex items-center gap-2">
-              {isGenerating ? (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={abortFunction}
-                  className="rounded-full w-10 h-10 bg-gray-900 text-red-400 hover:shadow-[0_0_5px_rgba(239,68,68,0.5)] hover:border-red-500/30 animate-pulse"
-                  disabled={!isLoadingComplete}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
-              ) : (
-                <>
-                  {messages.length > 0 && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={clearMessages}
-                      className="rounded-full w-10 h-10 bg-gray-900 text-gray-400 hover:shadow-[0_0_5px_rgba(156,163,175,0.3)] hover:border-gray-500/30 transition-transform hover:scale-105"
-                      disabled={!isLoadingComplete || messages.length === 0}
-                    >
-                      <Trash className="w-5 h-5" />
-                    </Button>
-                  )}
-                  <Button
-                    size="icon"
-                    onClick={handleSend}
-                    className={cn(
-                      "rounded-full w-10 h-10 transition-all duration-300 hover:scale-105",
-                      selectedMode === "reasoning" 
-                        ? "bg-gray-900 text-purple-400 border border-purple-500/30 shadow-[0_0_8px_rgba(124,58,237,0.5)]"
-                        : "bg-gray-900 text-blue-400 border border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
-                    )}
-                    disabled={!isLoadingComplete || isGenerating || !input.trim()}
-                  >
-                    <Send className="w-5 h-5" />
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {isMobile && (
-            <div className="flex justify-center gap-4 mt-4 animate-fade-in">
-              <button
-                className={cn(
-                  "flex items-center gap-2 px-4 py-1.5 rounded-full text-sm transition-all duration-300",
-                  selectedMode === "normal"
-                    ? "bg-gray-900 text-blue-400 shadow-[0_0_5px_rgba(59,130,246,0.3)] border border-blue-500/20"
-                    : "bg-gray-900 text-gray-400"
-                )}
-                onClick={() => handleModeChange("normal")}
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>Normal</span>
-              </button>
-              
-              <button
-                className={cn(
-                  "flex items-center gap-2 px-4 py-1.5 rounded-full text-sm transition-all duration-300",
-                  selectedMode === "reasoning"
-                    ? "bg-gray-900 text-purple-400 shadow-[0_0_5px_rgba(124,58,237,0.3)] border border-purple-500/20"
-                    : "bg-gray-900 text-gray-400"
-                )}
-                onClick={() => handleModeChange("reasoning")}
-              >
-                <Brain className="w-4 h-4" />
-                <span>Raisonnement</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Fixed input bar at bottom */}
+      <InputBar
+        input={input}
+        handleTyping={handleTyping}
+        handleKeyDown={handleKeyDown}
+        handleSend={handleSend}
+        isLoadingComplete={isLoadingComplete}
+        isGenerating={isGenerating}
+        abortFunction={abortFunction}
+        selectedMode={selectedMode}
+        handleModeChange={handleModeChange}
+        messages={messages}
+        clearMessages={clearMessages}
+        isMobile={isMobile}
+        inputRef={inputRef}
+        isConnected={isConnected}
+        selectedModel={selectedModel}
+      />
     </div>
   );
 };

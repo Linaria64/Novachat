@@ -13,30 +13,17 @@ export interface ChatSettings {
 }
 
 export interface OllamaModel {
+  id: string;
   name: string;
-  size: number;
-  digest: string;
-  modified_at: string;
-  details: {
-    format: string;
-    family: string;
-    parameter_size: string;
-    quantization_level: string;
-  };
 }
 
 export interface GroqModel {
   id: string;
   name: string;
-  description?: string;
-  context_length?: number;
-  pricing?: string;
 }
 
-export interface Message {
+export interface Message extends BaseMessage {
   id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
   timestamp: Date;
 }
 
