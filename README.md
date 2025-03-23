@@ -13,7 +13,6 @@
   <h3>✨ <a href="https://novachat-puce.vercel.app" target="_blank">Novachat.ai Click here</a> ✨</h3>
   <a href="https://novachat-puce.vercel.app" target="_blank">
   </a>
-  <p><em>Click the image to visit the site</em></p>
 </div>
 
 ## 🚀 Introduction
