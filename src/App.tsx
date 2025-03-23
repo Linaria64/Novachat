@@ -8,10 +8,10 @@ import LoadingScreen from "./components/LoadingScreen";
 import { checkConnection as checkGroqConnection, AVAILABLE_MODELS as GROQ_MODELS } from "@/services/groqService";
 import { checkConnection as checkOllamaConnection, AVAILABLE_MODELS as OLLAMA_MODELS, fetchOllamaModels } from "@/services/ollamaService";
 import "./App.css";
-import { toast } from "sonner";
 
 // Constants
-const LOADING_DELAY = 1000;
+const LOADING_DELAY = 2500;
+const LOADING_MIN_DISPLAY = 3200;
 const THEME_STORAGE_KEY = "chatopia-theme";
 const MOBILE_BREAKPOINT = 768;
 
@@ -24,6 +24,7 @@ function App() {
   const [isConnectedToOllama, setIsConnectedToOllama] = useState(false);
   const [selectedService, setSelectedService] = useState<"groq" | "ollama">("groq");
   const [selectedGroqModel, setSelectedGroqModel] = useState<string>("llama3-70b-8192");
+  const [selectedQwqModel] = useState<string>("qwen-qwq-32b");
   const [selectedOllamaModel, setSelectedOllamaModel] = useState<string>("llama3");
   
   // Application states
@@ -44,8 +45,9 @@ function App() {
     (window as any).isConnectedToOllama = isConnectedToOllama;
     (window as any).selectedService = selectedService;
     (window as any).selectedGroqModel = selectedGroqModel;
+    (window as any).selectedQwqModel = selectedQwqModel;
     (window as any).selectedOllamaModel = selectedOllamaModel;
-  }, [isDeveloperMode, isConnectedToOllama, selectedService, selectedGroqModel, selectedOllamaModel]);
+  }, [isDeveloperMode, isConnectedToOllama, selectedService, selectedGroqModel, selectedQwqModel, selectedOllamaModel]);
   
   // Theme management
   useEffect(() => {
@@ -74,6 +76,11 @@ function App() {
       try {
         const isConnected = await checkGroqConnection();
         setIsConnectedToGroq(isConnected);
+        
+        // Force connection to Groq by default
+        if (isConnected) {
+          setSelectedService("groq");
+        }
         
         // Also check Ollama if in developer mode
         if (isDeveloperMode) {
@@ -108,16 +115,82 @@ function App() {
       setTheme(prefersDark ? "dark" : "light");
     }
     
+    // Ensure the loading state is set to true initially
+    setIsLoading(true);
+    
+    // Enregistrer le temps de départ
+    const startTime = Date.now();
+    
+    // Définir les étapes de chargement
+    const loadingSteps = [
+      { status: "Initialisation...", progress: 0.2, delay: 800 },
+      { status: "Vérification des connexions...", progress: 0.4, delay: 1500 },
+      { status: "Préparation de l'interface...", progress: 0.6, delay: 2000 },
+      { 
+        status: isConnectedToGroq 
+          ? "Connexion établie, démarrage de l'application..." 
+          : isCheckingConnection 
+            ? "Tentative de connexion à l'API..." 
+            : "Finalisation sans connexion API...",
+        progress: isConnectedToGroq ? 0.9 : isCheckingConnection ? 0.7 : 0.8, 
+        delay: LOADING_DELAY 
+      }
+    ];
+    
+    // Lancer les étapes de chargement
+    loadingSteps.forEach((step) => {
+      setTimeout(() => {
+        if (isLoading) {
+          // Créer un événement personnalisé pour mettre à jour la barre de progression
+          window.dispatchEvent(new CustomEvent("novachat:loading-update", { 
+            detail: { 
+              status: step.status, 
+              progress: step.progress 
+            } 
+          }));
+        }
+      }, step.delay);
+    });
+    
     // Simulate loading process with a delay
     const loadingTimeout = setTimeout(() => {
       if (isConnectedToGroq || !isCheckingConnection) {
-        setIsLoading(false);
-        window.dispatchEvent(new CustomEvent("novachat:loading-complete"));
+        // Calculer le temps écoulé
+        const elapsedTime = Date.now() - startTime;
+        
+        // Si le temps écoulé est inférieur au minimum, attendre la différence
+        if (elapsedTime < LOADING_MIN_DISPLAY) {
+          // Étape finale
+          window.dispatchEvent(new CustomEvent("novachat:loading-update", { 
+            detail: { 
+              status: "Lancement de Novachat...", 
+              progress: 1.0 
+            } 
+          }));
+          
+          setTimeout(() => {
+            setIsLoading(false);
+            window.dispatchEvent(new CustomEvent("novachat:loading-complete"));
+          }, LOADING_MIN_DISPLAY - elapsedTime);
+        } else {
+          // Étape finale
+          window.dispatchEvent(new CustomEvent("novachat:loading-update", { 
+            detail: { 
+              status: "Lancement de Novachat...", 
+              progress: 1.0 
+            } 
+          }));
+          
+          setTimeout(() => {
+            setIsLoading(false);
+            window.dispatchEvent(new CustomEvent("novachat:loading-complete"));
+          }, 500); // Petit délai pour montrer 100%
+        }
       }
-    }, LOADING_DELAY * 3); 
+    }, LOADING_DELAY);
     
     return () => clearTimeout(loadingTimeout);
-  }, [isConnectedToGroq, isCheckingConnection]);
+  }, [isConnectedToGroq, isCheckingConnection, isLoading]);
   
   // Event handlers
   const toggleTheme = useCallback(() => {

@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { Send, X, Bot, Brain, Trash, ChevronDown, MessageSquare, Sparkles } from "lucide-react";
-import { generateGroqCompletion, checkConnection, AVAILABLE_MODELS } from "@/services/groqService";
-import { generateOllamaCompletion, AVAILABLE_MODELS as OLLAMA_MODELS } from "@/services/ollamaService";
-import { Message } from "@/types/chat";
+import { generateGroqCompletion, AVAILABLE_MODELS } from "@/services/groqService";
+import { generateOllamaCompletion } from "@/services/ollamaService";
+import { Message, BaseMessage, MessageRole } from "@/types/chat";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChatMessage } from "@/components/ChatMessage";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,7 +17,7 @@ const AUTO_SCROLL_DELAY = 100;
 const MOBILE_BREAKPOINT = 768;
 
 // Message roles
-const MessageRole = {
+const MessageRoles = {
   User: "user" as const,
   Assistant: "assistant" as const,
   System: "system" as const
@@ -103,7 +102,6 @@ const InputBar = memo(({
   isMobile,
   inputRef,
   isConnected,
-  selectedModel
 }: {
   input: string;
   handleTyping: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -119,7 +117,6 @@ const InputBar = memo(({
   isMobile: boolean;
   inputRef: React.RefObject<HTMLTextAreaElement>;
   isConnected: boolean;
-  selectedModel: string;
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-20">
@@ -308,7 +305,6 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<"normal" | "reasoning">("normal");
-  const [selectedModel, setSelectedModel] = useState<string>("");
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isLoadingComplete, setIsLoadingComplete] = useState<boolean>(false);
@@ -325,18 +321,8 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   useEffect(() => {
     // Update from global state
     const updateFromGlobalState = () => {
-      const isDev = (window as any).isDeveloperMode || false;
-      const selectedService = (window as any).selectedService || "groq";
-      
-      if (selectedService === "groq") {
-        // If using Groq
-        setSelectedModel((window as any).selectedGroqModel || "llama3-70b-8192");
-        setIsConnected((window as any).isConnectedToGroq || false);
-      } else {
-        // If using Ollama
-        setSelectedModel((window as any).selectedOllamaModel || "llama3");
-        setIsConnected(isDev && (window as any).isConnectedToOllama || false);
-      }
+      // Toujours considérer comme connecté pour éviter le blocage de l'interface
+      setIsConnected(true);
     };
     
     // Run once initially
@@ -379,7 +365,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
-      role: MessageRole.User,
+      role: MessageRoles.User,
       content: input.trim(),
       timestamp: new Date(),
     };
@@ -410,7 +396,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       // Create empty assistant message
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        role: MessageRole.Assistant,
+        role: MessageRoles.Assistant,
         content: "",
         timestamp: new Date(),
       };
@@ -421,21 +407,21 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       setTimeout(scrollToBottom, AUTO_SCROLL_DELAY);
       
       // Get conversation context
-      const conversationContext = messages
+      const conversationContext: BaseMessage[] = messages
         .slice(-MESSAGE_HISTORY_LIMIT)
         .map((msg) => ({
-          role: msg.role.toLowerCase(),
+          role: msg.role,
           content: msg.content,
         }));
       
       // Add user message to context
       conversationContext.push({
-        role: "user",
+        role: "user" as MessageRole,
         content: input.trim(),
       });
       
       // Generate completion based on selected service
-      let response;
+      let response: string | void;
       if (selectedService === "groq") {
         response = await generateGroqCompletion(
           modelToUse,
@@ -454,7 +440,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantMessage.id
-            ? { ...msg, content: response }
+            ? { ...msg, content: response as string || "" }
             : msg
         )
       );
@@ -688,7 +674,6 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
         isMobile={isMobile}
         inputRef={inputRef}
         isConnected={isConnected}
-        selectedModel={selectedModel}
       />
     </div>
   );

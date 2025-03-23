@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { checkConnection, generateCompletionStream } from "@/services/localService";
 import { Message } from "@/types/chat";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "sonner";
 import { toast } from "sonner";
 
 const GroqChatInterface: React.FC = () => {

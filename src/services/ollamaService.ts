@@ -1,5 +1,4 @@
-import { toast } from "sonner";
-import { BaseMessage, MessageRole, OllamaModel } from "@/types/chat";
+import { BaseMessage, OllamaModel } from "@/types/chat";
 
 // Types
 export type OllamaMessage = BaseMessage;
@@ -120,7 +119,6 @@ export async function checkConnection(): Promise<boolean> {
     }
   } catch (error) {
     console.error("Error checking connection to Ollama API:", error);
-    const generalError = error as Error;
     return false;
   }
 }
