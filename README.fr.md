@@ -10,7 +10,11 @@
 </div>
 
 <div align="center">
-  <img src="public/novachat-interface.png" alt="Interface Novachat" width="800" />
+  <h3>✨ <a href="https://novachat-puce.vercel.app" target="_blank">Essayez la démo en ligne</a> ✨</h3>
+  <a href="https://novachat-puce.vercel.app" target="_blank">
+    <img src="public/og-image.png" alt="Interface Novachat" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  </a>
+  <p><em>Cliquez sur l'image pour visiter le site</em></p>
 </div>
 
 ## 🚀 Introduction

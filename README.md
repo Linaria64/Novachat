@@ -10,7 +10,10 @@
 </div>
 
 <div align="center">
-  <img src="public/novachat-interface.png" alt="Novachat Interface" width="800" />
+  <h3>✨ <a href="https://novachat-puce.vercel.app" target="_blank">Try the live demo</a> ✨</h3>
+  <a href="https://novachat-puce.vercel.app" target="_blank">
+  </a>
+  <p><em>Click the image to visit the site</em></p>
 </div>
 
 ## 🚀 Introduction
@@ -106,5 +109,5 @@ This project is licensed under the MIT License.
 
 <div align="center">
   <p>Built with ❤️ using React, TypeScript and Tailwind CSS</p>
-  <p>© 2025 Novachat</p>
+  <p>© 2024 Novachat</p>
 </div>
