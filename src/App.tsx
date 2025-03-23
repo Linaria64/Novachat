@@ -37,7 +37,15 @@ function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < MOBILE_BREAKPOINT);
   
   // Function to check if viewport is mobile
-  const checkIsMobile = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+  const checkIsMobile = () => {
+    const isMobileView = window.innerWidth < MOBILE_BREAKPOINT;
+    setIsMobile(isMobileView);
+    
+    // Automatically disable developer mode on mobile
+    if (isMobileView && isDeveloperMode) {
+      setIsDeveloperMode(false);
+    }
+  };
   
   // API connection check function
   const checkApi = async () => {
@@ -94,13 +102,25 @@ function App() {
     document.body.classList.toggle("dark", theme === "dark");
   }, [theme]);
   
-  // Mobile detection
+  // Mobile detection and theme adjustment
   useEffect(() => {
     checkIsMobile();
     window.addEventListener("resize", checkIsMobile);
     
+    // Force dark theme on mobile
+    if (isMobile) {
+      setTheme("dark");
+    }
+    
     return () => window.removeEventListener("resize", checkIsMobile);
-  }, []);
+  }, [isDeveloperMode, setTheme]);
+  
+  // Disable developer mode when switching to mobile
+  useEffect(() => {
+    if (isMobile && isDeveloperMode) {
+      setIsDeveloperMode(false);
+    }
+  }, [isMobile]);
   
   // Set initial app state
   useEffect(() => {
@@ -182,10 +202,10 @@ function App() {
 
   // Secret developer mode activation
   const handleLogoClick = useCallback(() => {
-    if (!isDeveloperMode) {
+    if (!isDeveloperMode && !isMobile) {
       setIsDeveloperMode(true);
     }
-  }, [isDeveloperMode]);
+  }, [isDeveloperMode, isMobile]);
 
   // Memoized components
   const DesktopNavbar = useMemo(() => (
@@ -337,115 +357,6 @@ function App() {
     </div>
   ), [showNavbar, isDeveloperMode, toggleDeveloperMode, handleNewChat, handleOllamaConnection, handleGroqConnection, setShowSettingsDialog, setShowHelpDialog, 
      toggleTheme, theme, handleLogoClick]);
-
-  const MobileNavbar = useMemo(() => (
-    <div className="fixed bottom-3 left-1/2 transform -translate-x-1/2 h-16 px-1 flex items-center gap-1.5 sm:gap-2 bg-gray-900/40 backdrop-blur-md border border-gray-800/40 rounded-full z-40 border-[1.5px] border-gray-700/40 shadow-xl">
-      {/* Logo button de gauche */}
-      <button
-        className={`rounded-md p-2 text-white hover:bg-white/10 transition duration-200 ${
-          showNavbar ? "opacity-100" : "opacity-0"
-        }`}
-        onClick={handleLogoClick}
-        title="Novachat"
-        aria-label="Logo Novachat"
-      >
-        <Bot className="h-6 w-6 text-white" />
-      </button>
-    
-      {/* Developer mode button */}
-      {isDeveloperMode && (
-        <button 
-          className={`h-12 w-12 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 focus:outline-none ${
-            isDeveloperMode
-              ? "bg-amber-500"
-              : "bg-blue-500"
-          }`}
-          onClick={toggleDeveloperMode}
-          title={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
-          aria-label={isDeveloperMode ? "Passer en mode utilisateur" : "Passer en mode développeur"}
-        >
-          {isDeveloperMode ? (
-            <Code className="h-6 w-6 text-white" />
-          ) : (
-            <Bot className="h-6 w-6 text-white" />
-          )}
-        </button>
-      )}
-      
-      {/* New chat button - central et plus gros */}
-      <button 
-        className="h-12 w-12 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 focus:outline-none bg-gradient-to-br from-blue-600 to-indigo-700 text-white scale-110"
-        onClick={handleNewChat}
-        title="Nouvelle conversation"
-        aria-label="Nouvelle conversation"
-      >
-        <MessageSquare className="h-6 w-6 text-white" />
-      </button>
-      
-      {/* Developer mode buttons */}
-      {isDeveloperMode && (
-        <>
-          {/* Groq button */}
-          <button 
-            className={`h-12 w-12 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 focus:outline-none ${
-              selectedService === "groq" 
-                ? (isConnectedToGroq
-                  ? "bg-gradient-to-br from-green-600 to-emerald-700 text-white"
-                  : "bg-gradient-to-br from-blue-600 to-indigo-700 text-white")
-                : "bg-gray-800/80 text-gray-400"
-            }`}
-            onClick={handleGroqConnection}
-            title="Groq"
-            aria-label="Groq"
-          >
-            <div className="relative">
-              <MessageSquare className="h-6 w-6 text-white" />
-              {selectedService === "groq" && isConnectedToGroq && <div className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-green-400"></div>}
-            </div>
-          </button>
-          
-          {/* Ollama button */}
-          <button 
-            className={`h-12 w-12 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 focus:outline-none ${
-              selectedService === "ollama" 
-                ? (isConnectedToOllama
-                  ? "bg-gradient-to-br from-green-600 to-emerald-700 text-white"
-                  : "bg-gradient-to-br from-purple-600 to-indigo-700 text-white")
-                : "bg-gray-800/80 text-gray-400"
-            }`}
-            onClick={handleOllamaConnection}
-            title="Ollama"
-            aria-label="Ollama"
-          >
-            <div className="relative">
-              <Bot className="h-6 w-6 text-white" />
-              {selectedService === "ollama" && isConnectedToOllama && <div className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-green-400"></div>}
-            </div>
-          </button>
-        </>
-      )}
-      
-      {/* Settings button */}
-      <button 
-        className="h-12 w-12 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 focus:outline-none bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
-        onClick={() => setShowSettingsDialog(true)}
-        title="Paramètres"
-        aria-label="Paramètres"
-      >
-        <Settings className="h-6 w-6" />
-      </button>
-      
-      {/* Theme toggle button */}
-      <button 
-        className="h-12 w-12 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 focus:outline-none bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
-        onClick={toggleTheme}
-        title={theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
-        aria-label={theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
-      >
-        {theme === "dark" ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
-      </button>
-    </div>
-  ), [isDeveloperMode, handleLogoClick, toggleDeveloperMode, handleNewChat, handleOllamaConnection, setShowSettingsDialog, toggleTheme, theme]);
 
   const SettingsDialog = useMemo(() => (
     <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
@@ -657,12 +568,14 @@ function App() {
         />
       ) : (
         <>
-          {/* Responsive navigation */}
-          {!isMobile ? DesktopNavbar : MobileNavbar}
+          {/* Responsive navigation - only display on desktop */}
+          {!isMobile && DesktopNavbar}
 
           {/* Main chat area */}
-          <main className={`w-full ${isMobile ? 'pb-20 min-h-screen' : 'h-screen'}`}>
-            <ChatInterface className={isMobile ? 'mobile-optimized' : 'ml-12'} />
+          <main className={`w-full ${isMobile ? 'min-h-screen' : 'h-screen'}`}>
+            <ChatInterface 
+              className={isMobile ? 'mobile-optimized' : 'ml-12'}
+            />
           </main>
           
           {/* Dialogs */}

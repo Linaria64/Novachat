@@ -101,6 +101,7 @@ const InputBar = memo(({
   isMobile,
   inputRef,
   isConnected,
+  handleNewChat,
 }: {
   input: string;
   handleTyping: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -116,6 +117,7 @@ const InputBar = memo(({
   isMobile: boolean;
   inputRef: React.RefObject<HTMLTextAreaElement>;
   isConnected: boolean;
+  handleNewChat: () => void;
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-20">
@@ -136,10 +138,12 @@ const InputBar = memo(({
       </div>
       
       <div className={cn(
-        "backdrop-blur-md w-full py-2 sm:py-3 px-2 sm:px-4"
+        "backdrop-blur-md w-full py-2 sm:py-3 px-2 sm:px-4 border-t border-gray-800/40",
+        "bg-gradient-to-t from-gray-900 to-gray-900/95"
       )}>
         <div className="max-w-4xl mx-auto relative">
           <div className="flex items-end gap-1.5 sm:gap-2 rounded-xl border border-gray-700/50 bg-gray-800/50 backdrop-blur-md p-1.5 sm:p-2 shadow-lg">
+            {/* Mode toggle button for desktop */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -166,6 +170,18 @@ const InputBar = memo(({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+
+            {/* New Chat button for mobile */}
+            {isMobile && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="rounded-lg w-8 h-8 text-blue-400 hover:bg-blue-500/10 md:hidden"
+                onClick={handleNewChat}
+              >
+                <MessageSquare className="w-4 h-4" />
+              </Button>
+            )}
 
             <div className="relative flex-1">
               <Textarea
@@ -299,21 +315,41 @@ const InputBar = memo(({
 
 // Main component
 const ChatInterface = ({ className }: ChatInterfaceProps) => {
-  // Chat state
+  // State
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState<string>("");
+  const [input, setInput] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
   const [selectedMode, setSelectedMode] = useState<"normal" | "reasoning">("normal");
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [isLoadingComplete, setIsLoadingComplete] = useState<boolean>(false);
-  const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
-  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < MOBILE_BREAKPOINT);
+  const [isLoadingComplete, setIsLoadingComplete] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < MOBILE_BREAKPOINT);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Clear messages and start a new chat
+  const handleNewChat = useCallback(() => {
+    if (window.confirm("Démarrer une nouvelle conversation ?")) {
+      clearMessages();
+      // Add an event to notify other components
+      window.dispatchEvent(new CustomEvent('novachat:new-conversation'));
+    }
+  }, []);
+  
+  // Clear all messages
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+    // Stop ongoing generation
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsGenerating(false);
+    }
+  }, []);
   
   // Effects for global state synchronization
   useEffect(() => {
@@ -495,17 +531,6 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       handleSend();
     }
   }, [handleSend]);
-  
-  // Clear messages function
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-    // Stop ongoing generation
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-      setIsGenerating(false);
-    }
-  }, []);
   
   // Mode change handler
   const handleModeChange = useCallback((mode: "normal" | "reasoning") => {
@@ -692,9 +717,13 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
         handleModeChange={handleModeChange}
         clearMessages={clearMessages}
         abortFunction={abortFunction}
+        handleNewChat={handleNewChat}
       />
     </div>
   );
 };
 
-export default ChatInterface;
+export default memo(ChatInterface);
+
+// Export for use in other components
+export { InputBar };
