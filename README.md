@@ -33,8 +33,7 @@ This application allows you to interact with cutting-edge AI models directly fro
 - **Responsive Interface**: Automatically adapts to desktop and mobile screens
 - **Dark Theme**: Optimized for comfortable use day and night
 - **Developer Mode**: Advanced features for technical users
-- **PWA Features**: Install on your device for offline use
-- **Voice Recognition**: Dictate your messages instead of typing
+- **Data Confidentiality**: Runs locally on your machine thanks to Ollama, ensuring that your data remains confidential.
 - **Keyboard Shortcuts**: Quick and efficient navigation with shortcuts
 
 ## 🔌 API Connection
@@ -96,9 +95,6 @@ On mobile, Novachat offers an optimized experience:
 - Simplified interface without navigation bar
 - "New conversation" button integrated directly into the input area
 
-## 🤝 Contribution
-
-Contributions are welcome! Feel free to open an issue or submit a pull request.
 
 ## 📝 License
 
@@ -108,5 +104,5 @@ This project is licensed under the MIT License.
 
 <div align="center">
   <p>Built with ❤️ using React, TypeScript and Tailwind CSS</p>
-  <p>© 2024 Novachat</p>
+  <p>© 2025 Novachat</p>
 </div>
