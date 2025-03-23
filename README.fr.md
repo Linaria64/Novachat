@@ -10,11 +10,9 @@
 </div>
 
 <div align="center">
-  <h3>✨ <a href="https://novachat-puce.vercel.app" target="_blank">Essayez la démo en ligne</a> ✨</h3>
+  <h3>✨ <a href="https://novachat-puce.vercel.app" target="_blank">Novachat.ai Clique ici !</a> ✨</h3>
   <a href="https://novachat-puce.vercel.app" target="_blank">
-    <img src="public/og-image.png" alt="Interface Novachat" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
   </a>
-  <p><em>Cliquez sur l'image pour visiter le site</em></p>
 </div>
 
 ## 🚀 Introduction
@@ -88,19 +86,6 @@ npm run dev
 npm run build
 ```
 
-## 🌐 Variables d'environnement
-
-Créez un fichier `.env` à la racine du projet :
-
-```
-# Groq API
-VITE_GROQ_API_KEY=votre_clé_api_groq
-
-# Configuration optionnelle
-VITE_DEFAULT_MODEL=llama3-70b-8192
-VITE_REASONING_MODEL=qwen-qwq-32b
-```
-
 ## 📱 Interface Mobile
 
 Sur mobile, Novachat offre une expérience optimisée :
@@ -122,5 +107,5 @@ Ce projet est sous licence MIT.
 
 <div align="center">
   <p>Construit avec ❤️ en utilisant React, TypeScript et Tailwind CSS</p>
-  <p>© 2024 Novachat</p>
+  <p>© 2025 Novachat</p>
 </div> 
