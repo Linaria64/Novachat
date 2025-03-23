@@ -136,8 +136,7 @@ const InputBar = memo(({
       </div>
       
       <div className={cn(
-        "border-t border-gray-800/40 backdrop-blur-md w-full py-2 sm:py-3 px-2 sm:px-4",
-        "bg-gradient-to-t from-gray-900 to-gray-900/95"
+        "backdrop-blur-md w-full py-2 sm:py-3 px-2 sm:px-4"
       )}>
         <div className="max-w-4xl mx-auto relative">
           <div className="flex items-end gap-1.5 sm:gap-2 rounded-xl border border-gray-700/50 bg-gray-800/50 backdrop-blur-md p-1.5 sm:p-2 shadow-lg">

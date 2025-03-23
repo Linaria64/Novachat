@@ -5,15 +5,18 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ChatInterface from "./components/ChatInterface";
 import LoadingScreen from "./components/LoadingScreen";
+import { useTheme } from "@/components/ThemeProvider";
 import { checkConnection as checkGroqConnection, AVAILABLE_MODELS as GROQ_MODELS } from "@/services/groqService";
 import { checkConnection as checkOllamaConnection, AVAILABLE_MODELS as OLLAMA_MODELS, fetchOllamaModels } from "@/services/ollamaService";
 import "./App.css";
 
 // Constants
-const THEME_STORAGE_KEY = "chatopia-theme";
 const MOBILE_BREAKPOINT = 768;
 
 function App() {
+  // Theme
+  const { theme, setTheme } = useTheme();
+  
   // State
   const [isLoading, setIsLoading] = useState(true);
   
@@ -28,13 +31,51 @@ function App() {
   // Application states
   const [isConnectedToGroq, setIsConnectedToGroq] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
-  const [theme, setTheme] = useState<"light" | "dark">(
-    localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light"
-  );
   const [showNavbar, setShowNavbar] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < MOBILE_BREAKPOINT);
+  
+  // Function to check if viewport is mobile
+  const checkIsMobile = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+  
+  // API connection check function
+  const checkApi = async () => {
+    try {
+      setIsCheckingConnection(true);
+      // Définir les modèles par défaut
+      setSelectedGroqModel("llama3-70b-8192");
+      (window as any).selectedGroqModel = "llama3-70b-8192";
+      (window as any).selectedQwqModel = "qwen-qwq-32b";
+      
+      console.log("Tentative de connexion à Groq avec la clé API...");
+      const isConnected = await checkGroqConnection();
+      console.log("Résultat de la connexion à Groq:", isConnected);
+      setIsConnectedToGroq(isConnected);
+      
+      // Force connection to Groq by default
+      if (isConnected) {
+        setSelectedService("groq");
+        (window as any).selectedService = "groq";
+      }
+      
+      // Also check Ollama if in developer mode
+      if (isDeveloperMode) {
+        const isOllamaConnected = await checkOllamaConnection();
+        setIsConnectedToOllama(isOllamaConnected);
+        
+        // Fetch Ollama models if connected
+        if (isOllamaConnected) {
+          await fetchOllamaModels();
+        }
+      }
+    } catch (error) {
+      console.error("Error checking API connection:", error);
+      setIsConnectedToGroq(false);
+    } finally {
+      setIsCheckingConnection(false);
+    }
+  };
   
   // Share state with other components
   useEffect(() => {
@@ -51,76 +92,18 @@ function App() {
   useEffect(() => {
     // Set theme on body element
     document.body.classList.toggle("dark", theme === "dark");
-    
-    // Store theme preference
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
   
   // Mobile detection
   useEffect(() => {
-    const checkIsMobile = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    
     checkIsMobile();
     window.addEventListener("resize", checkIsMobile);
     
     return () => window.removeEventListener("resize", checkIsMobile);
   }, []);
   
-  // Check API connection
+  // Set initial app state
   useEffect(() => {
-    setIsCheckingConnection(true);
-    
-    const checkApi = async () => {
-      try {
-        // Définir les modèles par défaut
-        setSelectedGroqModel("llama3-70b-8192");
-        (window as any).selectedGroqModel = "llama3-70b-8192";
-        (window as any).selectedQwqModel = "qwen-qwq-32b";
-        
-        console.log("Tentative de connexion à Groq avec la clé API...");
-        const isConnected = await checkGroqConnection();
-        console.log("Résultat de la connexion à Groq:", isConnected);
-        setIsConnectedToGroq(isConnected);
-        
-        // Force connection to Groq by default
-        if (isConnected) {
-          setSelectedService("groq");
-          (window as any).selectedService = "groq";
-        }
-        
-        // Also check Ollama if in developer mode
-        if (isDeveloperMode) {
-          const isOllamaConnected = await checkOllamaConnection();
-          setIsConnectedToOllama(isOllamaConnected);
-          
-          // Fetch Ollama models if connected
-          if (isOllamaConnected) {
-            await fetchOllamaModels();
-          }
-        }
-      } catch (error) {
-        console.error("Error checking API connection:", error);
-        setIsConnectedToGroq(false);
-      } finally {
-        setIsCheckingConnection(false);
-      }
-    };
-    
-    // Exécuter immédiatement sans délai
-    checkApi();
-  }, [isDeveloperMode]);
-  
-  // Simulate loading process
-  useEffect(() => {
-    // Set initial theme based on system preference or stored value
-    const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-    if (storedTheme) {
-      setTheme(storedTheme as "light" | "dark");
-    } else {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      setTheme(prefersDark ? "dark" : "light");
-    }
-    
     // Stocker la clé API Groq avec la nouvelle fonction sécurisée
     const apiKey = "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";
     // Importer le service de stockage
@@ -135,13 +118,32 @@ function App() {
         window.dispatchEvent(new CustomEvent("novachat:loading-complete"));
       }, 500);
     });
+    
+    // Check API connection
+    checkApi();
+    
+    // Set up resize event listener
+    window.addEventListener("resize", checkIsMobile);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener("resize", checkIsMobile);
+    };
   }, []);
   
-  // Event handlers
+  // Recheck API when developer mode changes
+  useEffect(() => {
+    if (isDeveloperMode) {
+      checkApi();
+    }
+  }, [isDeveloperMode]);
+  
+  // Toggle theme
   const toggleTheme = useCallback(() => {
-    setTheme(prevTheme => prevTheme === "dark" ? "light" : "dark");
-  }, []);
+    setTheme(theme === "dark" ? "light" : "dark");
+  }, [theme, setTheme]);
 
+  // Event handlers
   const toggleDeveloperMode = useCallback(() => {
     setIsDeveloperMode(prev => !prev);
   }, []);
