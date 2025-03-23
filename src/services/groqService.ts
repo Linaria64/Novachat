@@ -242,15 +242,18 @@ export const generateCompletionStream = async (
       const apiKey = getApiKey();
       
       if (!apiKey) {
-        toast.error("Aucune clé API Groq trouvée. Veuillez la définir dans les paramètres.");
+        console.error("No Groq API key found");
         onError(new Error("Aucune clé API trouvée"));
         return;
       }
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT);
+      // Convert BaseMessage to API format
+      const formattedMessages = messages.map(msg => ({
+        role: msg.role.toLowerCase(),
+        content: msg.content
+      }));
       
-      const response = await fetch(GROQ_API_URL, {
+      const response = await fetch(`${GROQ_API_URL}/stream`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
@@ -258,25 +261,16 @@ export const generateCompletionStream = async (
         },
         body: JSON.stringify({
           model,
-          messages: messages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })),
-          stream: true,
+          messages: formattedMessages,
           temperature: 0.7,
           max_tokens: 4096,
           top_p: 0.95,
-          frequency_penalty: 0,
-          presence_penalty: 0
-        }),
-        signal: controller.signal
+          stream: true
+        })
       });
-
-      clearTimeout(timeoutId);
       
       if (!response.ok) {
-        const error = await response.json();
-        console.error("Groq API error:", error);
+        console.error(`HTTP error! Status: ${response.status}`);
         
         // Check for rate limiting or server errors that might be temporary
         if (response.status === 429 || response.status >= 500) {
@@ -289,66 +283,71 @@ export const generateCompletionStream = async (
           }
         }
         
-        toast.error(`Erreur API Groq: ${error.error?.message || response.statusText}`);
-        onError(new Error(error.error?.message || response.statusText));
+        const error = await response.text();
+        onError(new Error(`Erreur API: ${error || response.statusText}`));
         return;
       }
-
+      
       const reader = response.body?.getReader();
       if (!reader) {
-        throw new Error("Aucun lecteur disponible");
+        onError(new Error("Could not get reader from response"));
+        return;
       }
-
+      
       const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-          if (line.trim() === "") continue;
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            if (data === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(data);
-              const content = parsed.choices[0]?.delta?.content;
-              if (content) {
-                onChunk(content);
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            break;
+          }
+          
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(Boolean);
+          
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const jsonData = line.slice(6);
+              if (jsonData === "[DONE]") continue;
+              
+              try {
+                const data = JSON.parse(jsonData) as GroqResponse;
+                const content = data.choices[0]?.delta?.content || "";
+                if (content) {
+                  onChunk(content);
+                }
+              } catch (e) {
+                console.error("Error parsing streaming JSON:", e);
               }
-            } catch (e) {
-              console.error("Failed to parse chunk:", e);
             }
           }
         }
+        
+        onComplete();
+        return;
+      } catch (error) {
+        const streamError = error as Error;
+        console.error("Stream reading error:", streamError);
+        onError(streamError);
+        return;
       }
-      onComplete();
-      return; // Success, exit the retry loop
     } catch (error) {
       const typedError = error as Error;
       
-      // Don't retry if it's an abort error
-      if (typedError.name === 'AbortError') {
-        console.log("Stream request aborted");
-        onError(typedError);
-        return;
-      }
-      
-      // Don't retry if we've hit the maximum retries
       if (retries >= RETRY_COUNT) {
-        console.error("Maximum stream retries reached. Error:", typedError);
-        toast.error(`Échec de la génération du stream: ${typedError.message || 'Erreur inconnue'}`);
+        console.error("Maximum retries reached. Error:", typedError);
         onError(typedError);
         return;
       }
       
-      // Retry for network errors
       retries++;
       const delay = RETRY_DELAY * retries;
       console.log(`Network error in stream, retrying in ${delay}ms...`, typedError);
       await sleep(delay);
     }
   }
+  
+  onError(new Error("Failed to generate streaming completion after retries"));
 }; 
