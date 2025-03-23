@@ -9,7 +9,9 @@
   </a>
 </div>
 
-![Novachat](public/og-image.png)
+<div align="center">
+  <img src="public/novachat-interface.png" alt="Interface Novachat" width="800" />
+</div>
 
 ## 🚀 Introduction
 
