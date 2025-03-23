@@ -1,33 +1,20 @@
 import { cn } from "@/lib/utils";
 import { Message } from "@/types/chat";
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { ComponentProps, useState, memo, useMemo, useCallback } from 'react';
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { ComponentProps, useState, memo, useMemo, useCallback, useEffect } from 'react';
 import { motion } from "framer-motion";
-import { Bot, User, ClipboardCopy, Check, ExternalLink } from "lucide-react";
+import { Bot, User, ClipboardCopy, Check, ExternalLink, Info } from "lucide-react";
+import TypingIndicator from "@/components/TypingIndicator";
+import rehypeRaw from "rehype-raw";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ChatMessageProps {
   message: Message;
+  isGenerating?: boolean;
+  isLastMessage?: boolean;
+  showTimestamp?: boolean;
 }
-
-type MarkdownComponentMap = {
-  pre: (props: ComponentProps<'pre'>) => JSX.Element;
-  code: (props: ComponentProps<'code'>) => JSX.Element;
-  p: (props: ComponentProps<'p'>) => JSX.Element;
-  img: (props: ComponentProps<'img'>) => JSX.Element;
-  a: (props: ComponentProps<'a'>) => JSX.Element;
-  table: (props: ComponentProps<'table'>) => JSX.Element;
-  th: (props: ComponentProps<'th'>) => JSX.Element;
-  td: (props: ComponentProps<'td'>) => JSX.Element;
-  ul: (props: ComponentProps<'ul'>) => JSX.Element;
-  ol: (props: ComponentProps<'ol'>) => JSX.Element;
-  li: (props: ComponentProps<'li'>) => JSX.Element;
-  h1: (props: ComponentProps<'h1'>) => JSX.Element;
-  h2: (props: ComponentProps<'h2'>) => JSX.Element;
-  h3: (props: ComponentProps<'h3'>) => JSX.Element;
-  h4: (props: ComponentProps<'h4'>) => JSX.Element;
-  blockquote: (props: ComponentProps<'blockquote'>) => JSX.Element;
-};
 
 const messageVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -38,10 +25,20 @@ const messageVariants = {
   }
 };
 
-export const ChatMessage = memo(({ message }: ChatMessageProps) => {
+const MAX_VISIBLE_LENGTH = 8000;
+const LIMIT_WARNING_THRESHOLD = 7000;
+
+export const ChatMessage = memo(({ message, isGenerating, isLastMessage, showTimestamp = false }: ChatMessageProps) => {
   const [showCopied, setShowCopied] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isRendered, setIsRendered] = useState(false);
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+  
+  // Détecter si le message est trop long et pourrait causer des problèmes de performance
+  const isMessageLong = message.content.length > MAX_VISIBLE_LENGTH;
+  const isApproachingLimit = message.content.length > LIMIT_WARNING_THRESHOLD && !isMessageLong;
+  const displayContent = isExpanded ? message.content : message.content.slice(0, MAX_VISIBLE_LENGTH);
 
   const handleCopyCode = useCallback((code: string) => {
     navigator.clipboard.writeText(code);
@@ -49,8 +46,8 @@ export const ChatMessage = memo(({ message }: ChatMessageProps) => {
     setTimeout(() => setShowCopied(false), 2000);
   }, []);
 
-  const markdownComponents = useMemo<MarkdownComponentMap>(() => ({
-    pre(props) {
+  const markdownComponents = useMemo(() => ({
+    pre(props: ComponentProps<'pre'>) {
       const { children, ...rest } = props;
       const codeContent = children?.toString() || '';
       
@@ -73,7 +70,7 @@ export const ChatMessage = memo(({ message }: ChatMessageProps) => {
         </div>
       );
     },
-    code(props) {
+    code(props: ComponentProps<'code'>) {
       const { children, ...rest } = props;
       return (
         <code className="bg-gray-800/70 px-1 sm:px-1.5 py-0.5 rounded font-mono text-purple-300 text-[10px] sm:text-xs" {...rest}>
@@ -81,7 +78,7 @@ export const ChatMessage = memo(({ message }: ChatMessageProps) => {
         </code>
       );
     },
-    p(props) {
+    p(props: ComponentProps<'p'>) {
       const { children, ...rest } = props;
       return (
         <p className="text-xs sm:text-sm leading-relaxed my-1.5 sm:my-2" {...rest}>
@@ -89,7 +86,7 @@ export const ChatMessage = memo(({ message }: ChatMessageProps) => {
         </p>
       );
     },
-    img(props) {
+    img(props: ComponentProps<'img'>) {
       const { src, alt, ...rest } = props;
       return (
         <div className="relative my-3 sm:my-4 overflow-hidden rounded-lg shadow-md">
@@ -109,7 +106,7 @@ export const ChatMessage = memo(({ message }: ChatMessageProps) => {
         </div>
       );
     },
-    a(props) {
+    a(props: ComponentProps<'a'>) {
       const { href, children, ...rest } = props;
       return (
         <a 
@@ -124,23 +121,23 @@ export const ChatMessage = memo(({ message }: ChatMessageProps) => {
         </a>
       );
     },
-    table(props) {
+    table(props: ComponentProps<'table'>) {
       return (
         <div className="overflow-x-auto my-3 sm:my-4 rounded-lg border border-gray-700/50 bg-gray-900/40">
           <table className="min-w-full text-[10px] sm:text-xs" {...props} />
         </div>
       );
     },
-    th: props => <th className="bg-gray-800/70 px-2 sm:px-4 py-1 sm:py-2 text-left text-[10px] sm:text-xs font-semibold text-gray-300 uppercase tracking-wider" {...props} />,
-    td: props => <td className="border-t border-gray-800/40 px-2 sm:px-4 py-1 sm:py-2" {...props} />,
-    ul: props => <ul className="list-disc pl-4 sm:pl-5 my-1.5 sm:my-2 text-xs sm:text-sm space-y-0.5 sm:space-y-1" {...props} />,
-    ol: props => <ol className="list-decimal pl-4 sm:pl-5 my-1.5 sm:my-2 text-xs sm:text-sm space-y-0.5 sm:space-y-1" {...props} />,
-    li: props => <li className="my-0.5 sm:my-1" {...props} />,
-    h1: props => <h1 className="text-base sm:text-xl font-bold my-2 sm:my-3 text-white" {...props} />,
-    h2: props => <h2 className="text-sm sm:text-lg font-bold my-2 sm:my-3 text-white" {...props} />,
-    h3: props => <h3 className="text-xs sm:text-md font-bold my-1.5 sm:my-2 text-white" {...props} />,
-    h4: props => <h4 className="text-xs sm:text-sm font-bold my-1.5 sm:my-2 text-white" {...props} />,
-    blockquote: props => <blockquote className="border-l-2 sm:border-l-4 border-gray-600 pl-2 sm:pl-4 my-2 sm:my-3 italic text-gray-300 text-xs sm:text-sm" {...props} />
+    th: (props: ComponentProps<'th'>) => <th className="bg-gray-800/70 px-2 sm:px-4 py-1 sm:py-2 text-left text-[10px] sm:text-xs font-semibold text-gray-300 uppercase tracking-wider" {...props} />,
+    td: (props: ComponentProps<'td'>) => <td className="border-t border-gray-800/40 px-2 sm:px-4 py-1 sm:py-2" {...props} />,
+    ul: (props: ComponentProps<'ul'>) => <ul className="list-disc pl-4 sm:pl-5 my-1.5 sm:my-2 text-xs sm:text-sm space-y-0.5 sm:space-y-1" {...props} />,
+    ol: (props: ComponentProps<'ol'>) => <ol className="list-decimal pl-4 sm:pl-5 my-1.5 sm:my-2 text-xs sm:text-sm space-y-0.5 sm:space-y-1" {...props} />,
+    li: (props: ComponentProps<'li'>) => <li className="my-0.5 sm:my-1" {...props} />,
+    h1: (props: ComponentProps<'h1'>) => <h1 className="text-base sm:text-xl font-bold my-2 sm:my-3 text-white" {...props} />,
+    h2: (props: ComponentProps<'h2'>) => <h2 className="text-sm sm:text-lg font-bold my-2 sm:my-3 text-white" {...props} />,
+    h3: (props: ComponentProps<'h3'>) => <h3 className="text-xs sm:text-md font-bold my-1.5 sm:my-2 text-white" {...props} />,
+    h4: (props: ComponentProps<'h4'>) => <h4 className="text-xs sm:text-sm font-bold my-1.5 sm:my-2 text-white" {...props} />,
+    blockquote: (props: ComponentProps<'blockquote'>) => <blockquote className="border-l-2 sm:border-l-4 border-gray-600 pl-2 sm:pl-4 my-2 sm:my-3 italic text-gray-300 text-xs sm:text-sm" {...props} />
   }), [handleCopyCode, showCopied]);
 
   const formattedTime = useMemo(() => {
@@ -166,11 +163,27 @@ export const ChatMessage = memo(({ message }: ChatMessageProps) => {
       : "bg-indigo-500/20 text-indigo-300"
   ), [isUser]);
 
+  // Effectuer le rendu du message avec un léger délai pour éviter les blocages d'interface
+  useEffect(() => {
+    if (!isRendered) {
+      const timer = setTimeout(() => {
+        setIsRendered(true);
+      }, 10);
+      return () => clearTimeout(timer);
+    }
+  }, [isRendered]);
+  
+  // Gérer le clic pour afficher le message complet
+  const handleExpandClick = () => {
+    setIsExpanded(true);
+  };
+
   return (
     <motion.div
       className={cn(
         "flex w-full mb-4 sm:mb-6 items-start",
-        isUser ? "justify-end" : "justify-start"
+        isUser ? "justify-end" : "justify-start",
+        isLastMessage && isAssistant && !message.content && "animate-pulse"
       )}
       initial="hidden"
       animate="visible"
@@ -204,16 +217,80 @@ export const ChatMessage = memo(({ message }: ChatMessageProps) => {
 
         {/* Message content */}
         <div className="mt-1 sm:mt-1.5">
-          {isAssistant ? (
-            <Markdown
-              remarkPlugins={[remarkGfm]}
-              components={markdownComponents}
-            >
-              {message.content}
-            </Markdown>
+          {isAssistant && !message.content && isGenerating ? (
+            <div className="flex items-center justify-start h-6 text-gray-400">
+              <TypingIndicator />
+            </div>
+          ) : message.content ? (
+            <>
+              <div className="flex items-center mb-1 sm:mb-1.5">
+                <span className="text-sm sm:text-base font-medium">
+                  {isUser ? "Vous" : "Assistant"}
+                </span>
+                
+                {showTimestamp && message.timestamp && (
+                  <span className="ml-2 text-xs text-gray-400">
+                    {formattedTime}
+                  </span>
+                )}
+                
+                {/* Afficher le modèle si disponible */}
+                {isAssistant && message.model && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="ml-2 px-1.5 py-0.5 rounded-md bg-gray-800 text-xs text-gray-400 flex items-center gap-1">
+                          <Info className="w-3 h-3" />
+                          <span>{message.model}</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p className="text-xs">Modèle utilisé pour cette réponse</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+              
+              <div className="prose prose-invert prose-pre:my-2 prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-800 prose-pre:rounded-md prose-pre:text-xs max-w-none">
+                {isRendered ? (
+                  <div className="chat-message-content">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw]}
+                      components={markdownComponents}
+                    >
+                      {displayContent}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  <div className="animate-pulse">
+                    <div className="h-4 bg-gray-700/40 rounded mb-2 w-4/5"></div>
+                    <div className="h-4 bg-gray-700/40 rounded mb-2 w-3/5"></div>
+                    <div className="h-4 bg-gray-700/40 rounded w-2/4"></div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Bouton pour afficher le message complet si trop long */}
+              {isMessageLong && !isExpanded && (
+                <button 
+                  onClick={handleExpandClick}
+                  className="mt-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  Afficher le message complet
+                </button>
+              )}
+              
+              {isApproachingLimit && (
+                <div className="text-yellow-500 text-xs mt-1">
+                  Ce message est assez long. L'affichage pourrait être ralenti.
+                </div>
+              )}
+            </>
           ) : (
-            <div className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
-              {message.content}
+            <div className="text-gray-500 italic">
+              Message vide
             </div>
           )}
         </div>

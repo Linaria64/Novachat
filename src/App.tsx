@@ -10,8 +10,6 @@ import { checkConnection as checkOllamaConnection, AVAILABLE_MODELS as OLLAMA_MO
 import "./App.css";
 
 // Constants
-const LOADING_DELAY = 2500;
-const LOADING_MIN_DISPLAY = 3200;
 const THEME_STORAGE_KEY = "chatopia-theme";
 const MOBILE_BREAKPOINT = 768;
 
@@ -24,7 +22,7 @@ function App() {
   const [isConnectedToOllama, setIsConnectedToOllama] = useState(false);
   const [selectedService, setSelectedService] = useState<"groq" | "ollama">("groq");
   const [selectedGroqModel, setSelectedGroqModel] = useState<string>("llama3-70b-8192");
-  const [selectedQwqModel] = useState<string>("qwen-qwq-32b");
+  const [selectedQwqModel, setSelectedQwqModel] = useState<string>("qwen-qwq-32b");
   const [selectedOllamaModel, setSelectedOllamaModel] = useState<string>("llama3");
   
   // Application states
@@ -74,12 +72,20 @@ function App() {
     
     const checkApi = async () => {
       try {
+        // Définir les modèles par défaut
+        setSelectedGroqModel("llama3-70b-8192");
+        (window as any).selectedGroqModel = "llama3-70b-8192";
+        (window as any).selectedQwqModel = "qwen-qwq-32b";
+        
+        console.log("Tentative de connexion à Groq avec la clé API...");
         const isConnected = await checkGroqConnection();
+        console.log("Résultat de la connexion à Groq:", isConnected);
         setIsConnectedToGroq(isConnected);
         
         // Force connection to Groq by default
         if (isConnected) {
           setSelectedService("groq");
+          (window as any).selectedService = "groq";
         }
         
         // Also check Ollama if in developer mode
@@ -100,8 +106,8 @@ function App() {
       }
     };
     
-    const timeout = setTimeout(checkApi, 1500);
-    return () => clearTimeout(timeout);
+    // Exécuter immédiatement sans délai
+    checkApi();
   }, [isDeveloperMode]);
   
   // Simulate loading process
@@ -115,82 +121,21 @@ function App() {
       setTheme(prefersDark ? "dark" : "light");
     }
     
-    // Ensure the loading state is set to true initially
-    setIsLoading(true);
-    
-    // Enregistrer le temps de départ
-    const startTime = Date.now();
-    
-    // Définir les étapes de chargement
-    const loadingSteps = [
-      { status: "Initialisation...", progress: 0.2, delay: 800 },
-      { status: "Vérification des connexions...", progress: 0.4, delay: 1500 },
-      { status: "Préparation de l'interface...", progress: 0.6, delay: 2000 },
-      { 
-        status: isConnectedToGroq 
-          ? "Connexion établie, démarrage de l'application..." 
-          : isCheckingConnection 
-            ? "Tentative de connexion à l'API..." 
-            : "Finalisation sans connexion API...",
-        progress: isConnectedToGroq ? 0.9 : isCheckingConnection ? 0.7 : 0.8, 
-        delay: LOADING_DELAY 
-      }
-    ];
-    
-    // Lancer les étapes de chargement
-    loadingSteps.forEach((step) => {
+    // Stocker la clé API Groq avec la nouvelle fonction sécurisée
+    const apiKey = "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";
+    // Importer le service de stockage
+    import("@/services/localService").then(({ setApiKey }) => {
+      setApiKey(apiKey);
+      
+      // Attendre que la clé soit enregistrée avant de masquer l'écran de chargement
       setTimeout(() => {
-        if (isLoading) {
-          // Créer un événement personnalisé pour mettre à jour la barre de progression
-          window.dispatchEvent(new CustomEvent("novachat:loading-update", { 
-            detail: { 
-              status: step.status, 
-              progress: step.progress 
-            } 
-          }));
-        }
-      }, step.delay);
+        setIsLoading(false);
+        // Mettre à jour les éléments du DOM pour indiquer que le chargement est terminé
+        document.body.classList.remove("loading-active");
+        window.dispatchEvent(new CustomEvent("novachat:loading-complete"));
+      }, 500);
     });
-    
-    // Simulate loading process with a delay
-    const loadingTimeout = setTimeout(() => {
-      if (isConnectedToGroq || !isCheckingConnection) {
-        // Calculer le temps écoulé
-        const elapsedTime = Date.now() - startTime;
-        
-        // Si le temps écoulé est inférieur au minimum, attendre la différence
-        if (elapsedTime < LOADING_MIN_DISPLAY) {
-          // Étape finale
-          window.dispatchEvent(new CustomEvent("novachat:loading-update", { 
-            detail: { 
-              status: "Lancement de Novachat...", 
-              progress: 1.0 
-            } 
-          }));
-          
-          setTimeout(() => {
-            setIsLoading(false);
-            window.dispatchEvent(new CustomEvent("novachat:loading-complete"));
-          }, LOADING_MIN_DISPLAY - elapsedTime);
-        } else {
-          // Étape finale
-          window.dispatchEvent(new CustomEvent("novachat:loading-update", { 
-            detail: { 
-              status: "Lancement de Novachat...", 
-              progress: 1.0 
-            } 
-          }));
-          
-          setTimeout(() => {
-            setIsLoading(false);
-            window.dispatchEvent(new CustomEvent("novachat:loading-complete"));
-          }, 500); // Petit délai pour montrer 100%
-        }
-      }
-    }, LOADING_DELAY);
-    
-    return () => clearTimeout(loadingTimeout);
-  }, [isConnectedToGroq, isCheckingConnection, isLoading]);
+  }, []);
   
   // Event handlers
   const toggleTheme = useCallback(() => {
@@ -604,21 +549,42 @@ function App() {
               
               {/* Model selection */}
               {selectedService === "groq" ? (
-                <div className="flex flex-col gap-2">
-                  <h3 className="font-medium">Modèle Groq</h3>
-                  <Select value={selectedGroqModel} onValueChange={setSelectedGroqModel}>
-                    <SelectTrigger className="bg-gray-800 border-gray-700">
-                      <SelectValue placeholder="Sélectionner un modèle" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
-                      {GROQ_MODELS.map(model => (
-                        <SelectItem key={model.id} value={model.id} className="focus:bg-gray-700">
-                          {model.name}
+                <>
+                  <div className="flex flex-col gap-2">
+                    <h3 className="font-medium">Modèle Groq</h3>
+                    <Select value={selectedGroqModel} onValueChange={setSelectedGroqModel}>
+                      <SelectTrigger className="bg-gray-800 border-gray-700">
+                        <SelectValue placeholder="Sélectionner un modèle" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700">
+                        {GROQ_MODELS.map(model => (
+                          <SelectItem key={model.id} value={model.id} className="focus:bg-gray-700">
+                            {model.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Modèle de raisonnement */}
+                  <div className="flex flex-col gap-2">
+                    <h3 className="font-medium">Modèle de raisonnement</h3>
+                    <p className="text-sm text-muted-foreground">Utilisé en mode raisonnement</p>
+                    <Select value={selectedQwqModel} onValueChange={(value) => {
+                      setSelectedQwqModel(value);
+                      (window as any).selectedQwqModel = value;
+                    }}>
+                      <SelectTrigger className="bg-gray-800 border-gray-700">
+                        <SelectValue placeholder="Sélectionner un modèle de raisonnement" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700">
+                        <SelectItem value="qwen-qwq-32b" className="focus:bg-gray-700">
+                          Qwen QWQ (32B)
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
               ) : (
                 <div className="flex flex-col gap-2">
                   <h3 className="font-medium">Modèle Ollama</h3>

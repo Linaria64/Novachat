@@ -15,16 +15,22 @@ export interface ChatSettings {
 export interface OllamaModel {
   id: string;
   name: string;
+  size?: string;
+  quantization?: string;
+  format?: string;
 }
 
 export interface GroqModel {
   id: string;
   name: string;
+  maxTokens?: number;
+  description?: string;
 }
 
 export interface Message extends BaseMessage {
   id: string;
   timestamp: Date;
+  model?: string;
 }
 
 export interface ChatResponse {
@@ -72,4 +78,23 @@ export interface Conversation {
   messages: Message[];
   createdAt: number;
   updatedAt: number;
+}
+
+export interface User {
+  id: string;
+  username: string;
+  preferences?: UserPreferences;
+}
+
+export interface UserPreferences {
+  theme: "light" | "dark" | "system";
+  fontSize: "small" | "medium" | "large";
+  notifications: boolean;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  statusCode?: number;
 } 

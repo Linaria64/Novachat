@@ -1,4 +1,5 @@
 import { BaseMessage, MessageRole, GroqModel } from "@/types/chat";
+import { getApiKey } from "@/services/localService";
 
 // Types
 export type GroqMessage = BaseMessage;
@@ -36,42 +37,17 @@ if (!localStorage.getItem(SETTINGS_KEY)) {
 }
 
 // Available models
-export const AVAILABLE_MODELS: GroqModel[] = [
-  { id: "llama3-70b-8192", name: "Llama 3 70B" },
-  { id: "qwen-qwq-32b", name: "Qwen QWQ 32B" },
-  { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B" },
-  { id: "llama3-8b-8192", name: "Llama 3 8B" },
-  { id: "gemma-7b-it", name: "Gemma 7B" }
+export const AVAILABLE_MODELS = [
+  { id: "llama3-70b-8192", name: "Llama 3 (70B)" },
+  { id: "llama3-8b-8192", name: "Llama 3 (8B)" },
+  { id: "mixtral-8x7b-32768", name: "Mixtral (8x7B)" },
+  { id: "gemma-7b-it", name: "Gemma (7B)" },
+  { id: "qwen-qwq-32b", name: "Qwen QWQ (32B)" }
 ];
 
 // Default models
 export const DEFAULT_MODEL = "llama3-70b-8192";
 export const REASONING_MODEL = "qwen-qwq-32b";
-
-// Get API key from local storage
-export const getApiKey = (): string => {
-  // Lire directement depuis le localStorage
-  const groqApiKey = localStorage.getItem("chatopia-groq-api-key");
-  if (groqApiKey && groqApiKey.startsWith("gsk_")) {
-    return groqApiKey;
-  }
-  
-  // Clé API par défaut si aucune clé personnalisée n'est trouvée
-  const defaultApiKey = "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";
-  
-  // Sauvegarder la clé par défaut
-  localStorage.setItem("chatopia-groq-api-key", defaultApiKey);
-  
-  return defaultApiKey;
-};
-
-/**
- * Set the API key in localStorage
- * @param {string} apiKey - The API key to set
- */
-export function setApiKey(apiKey: string): void {
-  localStorage.setItem(SETTINGS_KEY, apiKey);
-}
 
 /**
  * Check if the connection to the Groq API is successful
@@ -81,14 +57,13 @@ export async function checkConnection(): Promise<boolean> {
   const apiKey = getApiKey();
   if (!apiKey) {
     console.error("API key not found");
-    return false;
+    return false; // Retourne false si pas de clé
   }
 
+  console.log("Tentative de connexion à Groq avec la clé API:", apiKey.substring(0, 10) + "...");
+  
   try {
-    // Pour éviter les délais trop longs, on réduit le timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s au lieu de 10s
-
+    // Faire un appel d'essai pour vérifier la connexion
     const response = await fetch(GROQ_API_URL, {
       method: "POST",
       headers: {
@@ -97,28 +72,21 @@ export async function checkConnection(): Promise<boolean> {
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
-        messages: [{ role: "user", content: "Hello" }],
-        max_tokens: 1, // Réduire pour accélérer la vérification
-        stream: false
-      }),
-      signal: controller.signal
+        messages: [{ role: "user", content: "Test connection" }],
+        max_tokens: 5
+      })
     });
-
-    clearTimeout(timeoutId);
     
-    // Si on a une réponse mais pas de clé API valide, enregistrer qu'on est déconnecté
-    if (!response.ok) {
-      console.error("Groq API connection failed:", await response.json());
+    if (response.ok) {
+      console.log("Connexion réussie à Groq");
+      return true;
+    } else {
+      console.error("Échec de la connexion à Groq:", await response.text());
       return false;
     }
-    
-    // On a réussi à se connecter
-    return true;
-    
   } catch (error) {
     console.error("Connection check failed:", error);
-    // En cas d'erreur réseau, retourner true pour éviter de bloquer l'interface
-    return true;
+    return false;
   }
 }
 
@@ -242,173 +210,108 @@ export async function generateCompletionStream(
 }
 
 /**
- * Process a stream of completion tokens
- * @param {ReadableStream} stream - The stream to process
- * @param {Function} onChunk - Callback for each chunk of content
- * @param {Function} onComplete - Callback for when the stream completes
- * @param {Function} onError - Callback for when an error occurs
+ * Generate a completion using the Groq API
+ * @param options Generation options
+ * @returns Completion response
  */
-async function processCompletionStream(
-  stream: ReadableStream,
-  onChunk: (chunk: string) => void,
-  onComplete: () => void,
-  onError: (error: Error) => void
-): Promise<void> {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
+export async function generateGroqCompletion(
+  options?: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    streamCallback?: (chunk: string) => void;
+    messages?: BaseMessage[];
+  }
+): Promise<string> {
+  // Get API key
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    console.error("API key not found");
+    return "Je ne peux pas vous aider pour le moment car la clé API n'est pas configurée. Veuillez configurer une clé API Groq dans les paramètres.";
+  }
+
+  // Configuration des paramètres de génération
+  const model = options?.model || DEFAULT_MODEL;
+  const temperature = options?.temperature !== undefined ? options?.temperature : 0.7;
+  const maxTokens = options?.maxTokens || 4000;
+  const stream = !!options?.streamCallback;
   
+  // Messages à envoyer à l'API
+  const messages = options?.messages || [{ role: "user" as MessageRole, content: "Présente-toi brièvement." }];
+  
+  console.log(`Génération de complétion avec le modèle ${model} (streaming: ${stream ? 'oui' : 'non'})`);
+
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      
-      if (done) {
-        break;
+    // Appel à l'API Groq
+    const response = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: temperature,
+        max_tokens: maxTokens,
+        stream: stream
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Erreur API Groq: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(`Erreur API Groq (${response.status}): ${errorText}`);
+    }
+
+    // Gérer le streaming si demandé
+    if (stream && options?.streamCallback) {
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("Le corps de la réponse est vide");
       }
+
+      let completeResponse = "";
       
-      const chunk = decoder.decode(value);
-      const lines = chunk.split("\n").filter(Boolean);
-      
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const jsonData = line.slice(6);
-          if (jsonData === "[DONE]") continue;
-          
-          try {
-            const data = JSON.parse(jsonData) as GroqResponse;
-            const content = data.choices[0]?.delta?.content || "";
-            if (content) {
-              onChunk(content);
+      // Lire le stream
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        // Convertir la réponse en texte
+        const chunk = new TextDecoder().decode(value);
+        
+        // Traiter chaque ligne du flux SSE
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.substring(6);
+            if (data === '[DONE]') continue;
+            
+            try {
+              const json = JSON.parse(data);
+              const content = json.choices[0]?.delta?.content;
+              
+              if (content) {
+                completeResponse += content;
+                options.streamCallback(content);
+              }
+            } catch (e) {
+              console.error("Erreur lors du parsing JSON:", e);
             }
-          } catch (e) {
-            console.error("Error parsing streaming JSON:", e);
           }
         }
       }
+      
+      return completeResponse;
+    } else {
+      // Mode non-streaming
+      const data = await response.json();
+      return data.choices[0]?.message?.content || "Pas de réponse générée";
     }
-    
-    onComplete();
   } catch (error) {
-    console.error("Stream reading error:", error);
-    onError(error as Error);
-  } finally {
-    reader.releaseLock();
-  }
-}
-
-/**
- * Unified function to generate completions from Groq API - supports both streaming and non-streaming
- * 
- * Overload 1: Used by components that handle streaming themselves
- * @param {string} model - The model to use
- * @param {BaseMessage[]} messages - The messages to complete
- * @param {AbortSignal} signal - Optional abort signal
- * @returns {Promise<string>} The completion text
- * 
- * Overload 2: Used with callbacks for streaming
- * @param {string} model - The model to use
- * @param {BaseMessage[]} messages - The messages to complete
- * @param {Function} onChunk - Callback for chunks
- * @param {Function} onComplete - Callback when complete
- * @param {Function} onError - Callback for errors
- * @returns {Promise<void>} Nothing
- */
-export async function generateGroqCompletion(
-  model: string,
-  messages: BaseMessage[],
-  signalOrChunk: AbortSignal | ((chunk: string) => void),
-  onComplete?: () => void,
-  onError?: (error?: Error) => void
-): Promise<string | void> {
-  // Get last message for model selection
-  const lastMessage = messages[messages.length - 1];
-  // For automatic model selection based on content
-  const modelToUse = model === "auto" 
-    ? getModelForMessage(lastMessage.content) 
-    : model;
-  
-  console.log(`Using model: ${modelToUse} for completion`);
-  
-  // Determine if we're in streaming or non-streaming mode
-  const isStreaming = typeof signalOrChunk === "function";
-  
-  if (isStreaming && onComplete && onError) {
-    // Streaming mode with callbacks
-    const onChunk = signalOrChunk as (chunk: string) => void;
-    
-    try {
-      const stream = await generateCompletionStream(messages, modelToUse as GroqModel["id"]);
-      await processCompletionStream(stream, onChunk, onComplete, onError);
-    } catch (error) {
-      console.error("Error in streaming mode:", error);
-      onError(error as Error);
-    }
-    
-    return;
-  } else {
-    // Non-streaming mode (returns full response)
-    const signal = signalOrChunk as AbortSignal;
-    let retries = 0;
-    
-    while (retries <= RETRY_COUNT) {
-      try {
-        console.log(`Generating non-streaming completion... (Attempt ${retries + 1}/${RETRY_COUNT + 1})`);
-        const apiKey = getApiKey();
-        
-        if (!apiKey) {
-          throw new Error("No API key found");
-        }
-        
-        // Format messages for the API
-        const formattedMessages = messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }));
-        
-        const response = await fetch(GROQ_API_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: modelToUse,
-            messages: formattedMessages,
-            temperature: 0.7,
-            max_tokens: 4000,
-            stream: false
-          }),
-          signal
-        });
-        
-        if (!response.ok) {
-          const error = await response.json();
-          console.error("Groq API error:", error);
-          throw new Error(error.error?.message || response.statusText);
-        }
-        
-        const data = await response.json();
-        return data.choices[0]?.message?.content || "";
-      } catch (error) {
-        const typedError = error as Error;
-        
-        // If it's an abort signal, don't retry
-        if (typedError.name === "AbortError") {
-          throw typedError;
-        }
-        
-        // If we've reached the max number of retries, throw the error
-        if (retries >= RETRY_COUNT) {
-          console.error("Maximum retries reached:", typedError);
-          throw typedError;
-        }
-        
-        retries++;
-        const delay = RETRY_DELAY * retries;
-        console.log(`Retrying in ${delay}ms...`, typedError);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-    
-    throw new Error("Failed to generate completion after retries");
+    console.error("Erreur lors de la génération:", error);
+    return `Une erreur est survenue lors de la communication avec l'API Groq. Détails: ${error instanceof Error ? error.message : String(error)}`;
   }
 } 

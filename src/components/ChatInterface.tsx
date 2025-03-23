@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { Send, X, Bot, Brain, Trash, ChevronDown, MessageSquare, Sparkles } from "lucide-react";
-import { generateGroqCompletion, AVAILABLE_MODELS } from "@/services/groqService";
+import { generateGroqCompletion } from "@/services/groqService";
 import { generateOllamaCompletion } from "@/services/ollamaService";
-import { Message, BaseMessage, MessageRole } from "@/types/chat";
+import { Message, MessageRole } from "@/types/chat";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,6 @@ import { ChatMessage } from "@/components/ChatMessage";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Constants
-const MESSAGE_HISTORY_LIMIT = 10;
 const TEXTAREA_MAX_HEIGHT_MOBILE = 150;
 const TEXTAREA_MAX_HEIGHT_DESKTOP = 200;
 const AUTO_SCROLL_DELAY = 100;
@@ -18,9 +17,9 @@ const MOBILE_BREAKPOINT = 768;
 
 // Message roles
 const MessageRoles = {
-  User: "user" as const,
-  Assistant: "assistant" as const,
-  System: "system" as const
+  User: "user" as MessageRole,
+  Assistant: "assistant" as MessageRole,
+  System: "system" as MessageRole
 };
 
 // Types
@@ -336,7 +335,13 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   
   // Scroll to bottom function
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      // En cas de problème avec le scroll, forcer un second scroll après un court délai
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+      }, 100);
+    }
   }, []);
   
   // Abort generation function
@@ -348,91 +353,89 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
     }
   }, []);
   
-  // Send message handler
+  // Handle send message
   const handleSend = useCallback(async () => {
     if (!input.trim() || isGenerating) return;
     
-    // Check connection
-    const selectedService = (window as any).selectedService || "groq";
-    const isServiceConnected = selectedService === "groq" 
-      ? (window as any).isConnectedToGroq 
-      : (window as any).isConnectedToOllama;
-      
-    if (!isServiceConnected) {
-      return;
+    // Determine model based on selected service and mode
+    let modelToUse = (window as any).selectedService === "groq" 
+      ? (window as any).selectedGroqModel || "llama3-70b-8192"
+      : (window as any).selectedOllamaModel || "llama3";
+    
+    // Override with reasoning model for Groq if in reasoning mode
+    if ((window as any).selectedService === "groq" && selectedMode === "reasoning") {
+      modelToUse = (window as any).selectedQwqModel || "qwen-qwq-32b";
+      console.log("Mode raisonnement activé, utilisation du modèle:", modelToUse);
     }
     
-    // Add user message
+    // Create user message
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       role: MessageRoles.User,
       content: input.trim(),
       timestamp: new Date(),
     };
     
-    setMessages((prev) => [...prev, userMessage]);
+    // Create assistant message placeholder
+    const assistantMessage: Message = {
+      id: crypto.randomUUID(),
+      role: MessageRoles.Assistant,
+      content: "",
+      timestamp: new Date(),
+      model: modelToUse
+    };
+    
+    // Update messages with user input and empty assistant response
+    setMessages((prev) => [...prev, userMessage, assistantMessage]);
+    
+    // Clear input
     setInput("");
-    
-    // Create AbortController for this request
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
-    
-    // Determine model based on selected service and mode
-    let modelToUse = selectedService === "groq" 
-      ? (window as any).selectedGroqModel || "llama3-70b-8192"
-      : (window as any).selectedOllamaModel || "llama3";
-    
-    // Override with reasoning model for Groq if in reasoning mode
-    if (selectedService === "groq" && selectedMode === "reasoning") {
-      const qwenModel = AVAILABLE_MODELS.find(model => model.id === "qwen-qwq-32b");
-      if (qwenModel) {
-        modelToUse = qwenModel.id;
-      }
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
     }
     
+    // Create abort controller
+    abortControllerRef.current = new AbortController();
+    
+    // Set generating state
+    setIsGenerating(true);
+    
     try {
-      setIsGenerating(true);
-      
-      // Create empty assistant message
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: MessageRoles.Assistant,
-        content: "",
-        timestamp: new Date(),
-      };
-      
-      setMessages((prev) => [...prev, assistantMessage]);
-      
-      // Scroll to empty message immediately
+      // Scroll to bottom after a short delay
       setTimeout(scrollToBottom, AUTO_SCROLL_DELAY);
       
-      // Get conversation context
-      const conversationContext: BaseMessage[] = messages
-        .slice(-MESSAGE_HISTORY_LIMIT)
-        .map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        }));
-      
-      // Add user message to context
-      conversationContext.push({
-        role: "user" as MessageRole,
-        content: input.trim(),
-      });
+      // Format messages for API
+      const apiMessages = [...messages, userMessage].map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
       
       // Generate completion based on selected service
       let response: string | void;
-      if (selectedService === "groq") {
-        response = await generateGroqCompletion(
-          modelToUse,
-          conversationContext,
-          signal
-        );
+      if ((window as any).selectedService === "groq") {
+        response = await generateGroqCompletion({
+          model: modelToUse,
+          temperature: 0.7,
+          maxTokens: 4000,
+          streamCallback: (chunk: string) => {
+            setMessages((prev) => {
+              const newMessages = [...prev];
+              const lastMessage = newMessages[newMessages.length - 1];
+              if (lastMessage && lastMessage.role === MessageRoles.Assistant) {
+                lastMessage.content += chunk;
+              }
+              return newMessages;
+            });
+            // Scroll to bottom during streaming
+            scrollToBottom();
+          },
+          messages: apiMessages
+        });
       } else {
         response = await generateOllamaCompletion(
           modelToUse,
-          conversationContext,
-          signal
+          apiMessages,
+          abortControllerRef.current?.signal
         );
       }
       
@@ -579,9 +582,8 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
     };
   }, []);
   
-  // Scroll button visibility
+  // Chat scroll detection
   useEffect(() => {
-    // Check scroll position
     const checkScroll = () => {
       if (!chatContainerRef.current) return;
       
@@ -591,89 +593,106 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       setShowScrollButton(!isNearBottom);
     };
     
-    // Add scroll event listener to chat container
-    const chatContainer = chatContainerRef.current;
-    if (chatContainer) {
-      chatContainer.addEventListener("scroll", checkScroll);
+    const container = chatContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', checkScroll);
+      
+      // Vérifier la position initiale
+      checkScroll();
     }
     
-    // Clean up event listener
     return () => {
-      if (chatContainer) {
-        chatContainer.removeEventListener("scroll", checkScroll);
+      if (container) {
+        container.removeEventListener('scroll', checkScroll);
       }
     };
-  }, []);
+  }, [messages]); // Re-appliquer lorsque les messages changent
+
+  // Scroll automatiquement lorsque les messages changent
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [messages, scrollToBottom]);
 
   // Background gradient elements - memoized to prevent unnecessary rerenders
-  const backgroundGradients = useMemo(() => (
+  const backgroundElements = useMemo(() => (
     <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
       <div className="absolute top-0 right-0 w-2/3 h-2/3 bg-gradient-to-br from-blue-600/5 to-purple-600/5 rounded-full filter blur-3xl opacity-40 animate-[pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite]"></div>
       <div className="absolute bottom-0 left-0 w-2/3 h-2/3 bg-gradient-to-tr from-emerald-600/5 to-blue-600/5 rounded-full filter blur-3xl opacity-40 animate-[pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite] delay-1000"></div>
     </div>
   ), []);
   
-  // Scroll button - memoized to prevent unnecessary rerenders
-  const scrollButton = useMemo(() => {
-    if (!showScrollButton || messages.length === 0) return null;
+  // Render messages or welcome screen
+  const renderContent = useMemo(() => {
+    if (messages.length === 0) {
+      return <WelcomeScreen selectedMode={selectedMode} handleModeChange={handleModeChange} />;
+    }
     
     return (
-      <button
-        className="fixed bottom-[90px] sm:bottom-[100px] md:bottom-[120px] right-2 sm:right-4 bg-gray-800/80 backdrop-blur-sm text-white rounded-full w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center shadow-lg transition-all hover:bg-gray-700 border border-white/10 z-50"
-        onClick={scrollToBottom}
-        aria-label="Scroll to bottom"
-      >
-        <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
-      </button>
-    );
-  }, [showScrollButton, messages.length, scrollToBottom]);
-  
-  return (
-    <div className={cn("flex flex-col h-screen bg-gradient-to-b from-black to-gray-900", className)}>
-      <div className="flex-1 overflow-hidden relative">
-        {/* Animated background gradients */}
-        {backgroundGradients}
-        
-        <div 
-          ref={chatContainerRef}
-          className="absolute inset-0 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent z-10 p-3 sm:p-4 md:p-6">
-          <div className="max-w-4xl mx-auto">
-            {messages.length === 0 ? (
-              <WelcomeScreen
-                selectedMode={selectedMode}
-                handleModeChange={handleModeChange}
-              />
-            ) : (
-              <div className="space-y-4 sm:space-y-6 pb-24 sm:pb-28 md:pb-32">
-                {messages.map((message) => (
-                  <ChatMessage key={message.id} message={message} />
-                ))}
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-            
-            {/* Scroll to bottom button */}
-            {scrollButton}
-          </div>
+      <div className="relative z-10 py-4 sm:py-8 px-2 sm:px-4">
+        <div className="space-y-4 sm:space-y-6 pb-24 sm:pb-28 md:pb-32">
+          {messages.map((message, index) => (
+            <ChatMessage 
+              key={message.id} 
+              message={message} 
+              isGenerating={isGenerating && index === messages.length - 1}
+              isLastMessage={index === messages.length - 1}
+            />
+          ))}
         </div>
+        <div ref={messagesEndRef} className="h-1" />
       </div>
+    );
+  }, [messages, selectedMode, handleModeChange, isGenerating]);
 
-      {/* Fixed input bar at bottom */}
-      <InputBar
+  return (
+    <div className={cn("flex flex-col h-full relative", className)}>
+      {/* Background gradient elements */}
+      {backgroundElements}
+      
+      {/* Chat container */}
+      <div 
+        ref={chatContainerRef}
+        className="h-full overflow-y-auto pb-36 md:pb-40"
+        onScroll={() => {
+          if (chatContainerRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+            const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+            setShowScrollButton(!isNearBottom);
+          }
+        }}
+      >
+        {renderContent}
+      </div>
+      
+      {/* Scroll to bottom button */}
+      {showScrollButton && messages.length > 0 && (
+        <button
+          className="fixed bottom-32 right-4 sm:right-8 bg-gray-900/80 backdrop-blur-sm text-white rounded-full p-2 shadow-lg border border-gray-700/40 hover:bg-gray-800/90 transition-all z-20"
+          onClick={scrollToBottom}
+          aria-label="Descendre"
+        >
+          <ChevronDown size={20} />
+        </button>
+      )}
+      
+      {/* Input bar */}
+      <InputBar 
         input={input}
+        isConnected={isConnected}
+        isGenerating={isGenerating}
+        isLoadingComplete={isLoadingComplete}
+        isMobile={isMobile}
+        messages={messages}
+        selectedMode={selectedMode}
+        inputRef={inputRef}
         handleTyping={handleTyping}
         handleKeyDown={handleKeyDown}
         handleSend={handleSend}
-        isLoadingComplete={isLoadingComplete}
-        isGenerating={isGenerating}
-        abortFunction={abortFunction}
-        selectedMode={selectedMode}
         handleModeChange={handleModeChange}
-        messages={messages}
         clearMessages={clearMessages}
-        isMobile={isMobile}
-        inputRef={inputRef}
-        isConnected={isConnected}
+        abortFunction={abortFunction}
       />
     </div>
   );
